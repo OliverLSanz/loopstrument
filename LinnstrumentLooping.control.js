@@ -26,38 +26,76 @@ function init() {
     transport = host.createTransport();
     tracks = host.createMainTrackBank(5, 0, 3);
     host.getMidiInPort(0).setMidiCallback(onMidi0);
-    host.getMidiInPort(0).setSysexCallback(onSysex0);
     // Channel 0: Used to control bitwig
     // Channels 1-15: Used for MPE
     const noteIn = host.getMidiInPort(0)
         .createNoteInput("LinnStrument", "?1????", "?2????", "?3????", "?4????", "?5????", "?6????", "?7????", "?8????", "?9????", "?A????", "?B????", "?C????", "?D????", "?E????", "?F????")
         .setUseExpressiveMidi(true, 0, 48);
+    initLights();
     // TODO: Perform further initialization here.
     println("LinnstrumentLooping initialized!");
+}
+const lightColorValues = {
+    default: 0,
+    red: 1,
+    yellow: 2,
+    green: 3,
+    cyan: 4,
+    blue: 5,
+    magenta: 6,
+    off: 7,
+    white: 8,
+    orange: 9,
+    lime: 10,
+    pink: 11,
+};
+function setLight({ row, column, color }) {
+    // 20 is for select column to change color, 1 is first play column.
+    midiOut({ type: CC, channel: 0, data1: 20, data2: column + 1 });
+    // 21 for select row. Top is 7.
+    midiOut({ type: CC, channel: 0, data1: 21, data2: Math.abs(row - 7) });
+    // 22 to set color, 1 is red
+    midiOut({ type: CC, channel: 0, data1: 22, data2: lightColorValues[color] });
+}
+function initLights() {
+    setLight({ row: 1, column: 1, color: "off" });
+    setLight({ row: 1, column: 2, color: "off" });
+    setLight({ row: 1, column: 3, color: "off" });
+    setLight({ row: 1, column: 4, color: "off" });
+    setLight({ row: 1, column: 5, color: "off" });
+}
+function armOneTrack(trackBank, trackIndex) {
+    const bankSize = trackBank.getSizeOfBank();
+    for (let i = 0; i < bankSize; i++) {
+        trackBank.getItemAt(i).arm().set(trackIndex === i);
+        setLight({ row: 0, column: i, color: trackIndex === i ? "red" : "off" });
+    }
+}
+const NOTE_ON = 9;
+const CC = 11;
+function midiOut({ type, channel, data1, data2 }) {
+    const status = type << 4 + channel;
+    host.getMidiOutPort(0).sendMidi(status, data1, data2);
 }
 // Called when a short MIDI message is received on MIDI input port 0.
 function onMidi0(status, data1, data2) {
     // TODO: Implement your MIDI input handling code here.
-}
-// Called when a MIDI sysex message is received on MIDI input port 0.
-function onSysex0(data) {
-    // MMC Transport Controls:
-    switch (data) {
-        case "f07f7f0605f7":
-            transport.rewind();
-            break;
-        case "f07f7f0604f7":
-            transport.fastForward();
-            break;
-        case "f07f7f0601f7":
-            transport.stop();
-            break;
-        case "f07f7f0602f7":
-            transport.play();
-            break;
-        case "f07f7f0606f7":
-            transport.record();
-            break;
+    const type = status >> 4;
+    const channel = status % 16;
+    if (type === NOTE_ON && data1 === 65) {
+        armOneTrack(tracks, 0);
+    }
+    if (type === NOTE_ON && data1 === 66) {
+        armOneTrack(tracks, 1);
+    }
+    if (type === NOTE_ON && data1 === 67) {
+        armOneTrack(tracks, 2);
+    }
+    if (type === NOTE_ON && data1 === 68) {
+        armOneTrack(tracks, 3);
+    }
+    if (type === NOTE_ON && data1 === 69) {
+        armOneTrack(tracks, 4);
     }
 }
 function flush() {
