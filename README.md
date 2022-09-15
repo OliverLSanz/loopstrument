@@ -18,6 +18,7 @@ PITCH/X: OFF
 TIMBRE/Y: OFF
 LOUDNESS/Z: OFF
 WIDTH: 5 Columns
+PLAYED COLOR: Off (no light)
 
 ## Right Split
 
@@ -39,3 +40,21 @@ POWER/MIDI: USB
 
 Use the 5 top buttons in the left split to change between the first 5 tracks
 in bitwig. The leds will tell which track is currently engaged.
+
+## Use Clips
+
+The three rows bellow the track row are the clip launchers.
+
+- Launch an empty clip with that track enabled to start recording (red light
+will turn on).
+
+- Press again to stop recording (white light will indicate that the clip has
+content).
+
+- Press any clip with content to launch it.
+
+- Press again to stop it.
+
+- Only one clip from each track can play at the same time.
+
+- Long press on a clip to delete it.

@@ -2,5 +2,6 @@
   "devDependencies": {
     "typed-bitwig-api": "^17.0.1",
     "typescript": "^4.7.4"
-  }
+  },
+  "dependencies": {}
 }
