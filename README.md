@@ -58,3 +58,16 @@ content).
 - Only one clip from each track can play at the same time.
 
 - Long press on a clip to delete it.
+
+## Function table
+
+|   | 0                            | 1                    | 2                    | 3                    | 4                    |
+|---|------------------------------|----------------------|----------------------|----------------------|----------------------|
+| 0 | Arm track 1                  | Arm Track 2          | Arm track 3          | Arm track 4          | Arm track 5          |
+| 1 | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
+| 2 | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
+| 3 | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
+| 4 |                              |                      |                      |                      |                      |
+| 5 |                              |                      |                      |                      |                      |
+| 6 |                              |                      |                      |                      |                      |
+| 7 |  | Undo   | Redo                  |                      |                      |

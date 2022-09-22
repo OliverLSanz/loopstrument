@@ -10,6 +10,7 @@ host.defineMidiPorts(1, 1);
 
 let tracks: API.TrackBank
 let transport: API.Transport
+let application: API.Application
 
 let scheduledTasks: Set<string> = new Set<string>()
 let longPressTasks: { [note: number]: { taskId: string, shortPress: ()=>void } } = {}
@@ -36,6 +37,7 @@ else if (host.platformIsLinux())
 function init() {
    transport = host.createTransport();
    tracks = host.createMainTrackBank(5, 0, 3)
+   application = host.createApplication()
    host.getMidiInPort(0).setMidiCallback(onMidi0);
 
    // Channel 0: Used to control bitwig
@@ -81,11 +83,10 @@ function setLight({ row, column, color }: { row: row; column: number; color: lig
 }
 
 function initLights(){
-   setLight({ row: 1, column: 1, color: "off" })
-   setLight({ row: 1, column: 2, color: "off" })
-   setLight({ row: 1, column: 3, color: "off" })
-   setLight({ row: 1, column: 4, color: "off" })
-   setLight({ row: 1, column: 5, color: "off" })
+   // undo
+   setLight({ row: 7, column: 1, color: "magenta" })
+   // redo
+   setLight({ row: 7, column: 2, color: "blue" })
 }
 
 function updateClipLight(trackIndex: number, clipIndex: number){
@@ -236,6 +237,14 @@ function onMidi0 (status: number, data1: number, data2: number){
 
    if(type === NOTE_OFF && data1 >= 50 && data1 <= 64){
       handlePressEnd(data1)
+   }
+
+   if(type === NOTE_ON && data1 === 31){
+      application.undo()
+   }
+
+   if(type === NOTE_ON && data1 === 32){
+      application.redo()
    }
 }
 
