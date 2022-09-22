@@ -72,6 +72,8 @@ const lightColorValues = {
 
 type row = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 type column = 0 | 1 | 2 | 3 | 4
+const rowIndexes: row[] = [0, 1, 2, 3, 4, 5, 6, 7]
+const columnIndexes: column[] = [0, 1, 2, 3, 4]
 
 function setLight({ row, column, color }: { row: row; column: number; color: lightColor }){
    // 20 is for select column to change color, 1 is first play column.
@@ -83,6 +85,13 @@ function setLight({ row, column, color }: { row: row; column: number; color: lig
 }
 
 function initLights(){
+   // Turn off all lights
+   rowIndexes.forEach((rowIndex) => {
+      columnIndexes.forEach((columnIndex) => {
+         setLight({ row: rowIndex, column: columnIndex, color: "off"})
+      })
+   })
+
    // undo
    setLight({ row: 7, column: 1, color: "magenta" })
    // redo
@@ -133,6 +142,10 @@ function initObservers(){
          })
       }
    }
+
+   transport.isClipLauncherOverdubEnabled().addValueObserver( overdubEnabled => {
+      setLight({ row: 7, column: 0, color: overdubEnabled? "red" : "white"})
+   })
 }
 
 function armOneTrack(trackBank: API.TrackBank, trackIndex: number) {
@@ -237,6 +250,11 @@ function onMidi0 (status: number, data1: number, data2: number){
 
    if(type === NOTE_OFF && data1 >= 50 && data1 <= 64){
       handlePressEnd(data1)
+   }
+
+   if(type === NOTE_ON && data1 === 30){
+      const overdubEnabled = transport.isClipLauncherOverdubEnabled().getAsBoolean()
+      transport.isClipLauncherOverdubEnabled().set(!overdubEnabled)
    }
 
    if(type === NOTE_ON && data1 === 31){

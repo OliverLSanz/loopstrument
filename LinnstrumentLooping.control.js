@@ -7,6 +7,7 @@ host.defineController("Roger Linn Design", "LinnstrumentLooping", "0.1", "e72dbb
 host.defineMidiPorts(1, 1);
 let tracks;
 let transport;
+let application;
 let scheduledTasks = new Set();
 let longPressTasks = {};
 if (host.platformIsWindows()) {
@@ -27,6 +28,7 @@ else if (host.platformIsLinux()) {
 function init() {
     transport = host.createTransport();
     tracks = host.createMainTrackBank(5, 0, 3);
+    application = host.createApplication();
     host.getMidiInPort(0).setMidiCallback(onMidi0);
     // Channel 0: Used to control bitwig
     // Channels 1-15: Used for MPE
@@ -51,6 +53,8 @@ const lightColorValues = {
     lime: 10,
     pink: 11,
 };
+const rowIndexes = [0, 1, 2, 3, 4, 5, 6, 7];
+const columnIndexes = [0, 1, 2, 3, 4];
 function setLight({ row, column, color }) {
     // 20 is for select column to change color, 1 is first play column.
     midiOut({ type: CC, channel: 0, data1: 20, data2: column + 1 });
@@ -60,11 +64,16 @@ function setLight({ row, column, color }) {
     midiOut({ type: CC, channel: 0, data1: 22, data2: lightColorValues[color] });
 }
 function initLights() {
-    setLight({ row: 1, column: 1, color: "off" });
-    setLight({ row: 1, column: 2, color: "off" });
-    setLight({ row: 1, column: 3, color: "off" });
-    setLight({ row: 1, column: 4, color: "off" });
-    setLight({ row: 1, column: 5, color: "off" });
+    // Turn off all lights
+    rowIndexes.forEach((rowIndex) => {
+        columnIndexes.forEach((columnIndex) => {
+            setLight({ row: rowIndex, column: columnIndex, color: "off" });
+        });
+    });
+    // undo
+    setLight({ row: 7, column: 1, color: "magenta" });
+    // redo
+    setLight({ row: 7, column: 2, color: "blue" });
 }
 function updateClipLight(trackIndex, clipIndex) {
     const track = tracks.getItemAt(trackIndex);
@@ -105,6 +114,9 @@ function initObservers() {
             });
         }
     }
+    transport.isClipLauncherOverdubEnabled().addValueObserver(overdubEnabled => {
+        setLight({ row: 7, column: 0, color: overdubEnabled ? "red" : "white" });
+    });
 }
 function armOneTrack(trackBank, trackIndex) {
     const bankSize = trackBank.getSizeOfBank();
@@ -186,6 +198,16 @@ function onMidi0(status, data1, data2) {
     }
     if (type === NOTE_OFF && data1 >= 50 && data1 <= 64) {
         handlePressEnd(data1);
+    }
+    if (type === NOTE_ON && data1 === 30) {
+        const overdubEnabled = transport.isClipLauncherOverdubEnabled().getAsBoolean();
+        transport.isClipLauncherOverdubEnabled().set(!overdubEnabled);
+    }
+    if (type === NOTE_ON && data1 === 31) {
+        application.undo();
+    }
+    if (type === NOTE_ON && data1 === 32) {
+        application.redo();
     }
 }
 function flush() {

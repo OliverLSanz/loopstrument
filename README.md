@@ -70,4 +70,4 @@ content).
 | 4 |                              |                      |                      |                      |                      |
 | 5 |                              |                      |                      |                      |                      |
 | 6 |                              |                      |                      |                      |                      |
-| 7 |  | Undo   | Redo                  |                      |                      |
+| 7 | Toggle clip launcher overdub | Undo   | Redo                  |                      |                      |
