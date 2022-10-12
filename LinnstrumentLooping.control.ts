@@ -154,6 +154,12 @@ function armOneTrack(trackBank: API.TrackBank, trackIndex: number) {
    for(let i = 0; i < bankSize; i++) {
       trackBank.getItemAt(i).arm().set(trackIndex === i)
    }
+
+   const selectedTrack = trackBank.getItemAt(trackIndex)
+   selectedTrack.selectInEditor()
+   selectedTrack.selectInMixer()
+   selectedTrack.makeVisibleInArranger()
+   selectedTrack.makeVisibleInMixer()
 }
 
 const NOTE_OFF = 8
