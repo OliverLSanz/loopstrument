@@ -135,7 +135,7 @@ class LinnStrument {
 
 type ScheduledTasks = Set<string>
 
-export class TaskManager {
+class TaskManager {
   #scheduledTasks: ScheduledTasks
   #host: API.ControllerHost
 
@@ -171,7 +171,7 @@ export class TaskManager {
 
 // Allows setting different callbacks for taps and long-presses
 
-export class PressHandler {
+class PressHandler {
   longPressTasks: { [note: number]: { taskId: string, shortPress: () => void } }
   taskManager: TaskManager
 
@@ -207,15 +207,117 @@ export class PressHandler {
 
 // Avobe this all were helper classes. This is the actual controller code!
 
-class LiveLoopingController {
+class ControllerModule {
   bitwig: Bitwig
   pressHandler: PressHandler
   linn: LinnStrument
 
-  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument){
+  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument) {
     this.bitwig = bitwig
     this.pressHandler = pressHandler
     this.linn = linnstrument
+  }
+
+  init(): void{ }
+
+  canHandleMidi(midi: MidiMessage): boolean { return false }
+
+  handleMidi(midi: MidiMessage): void { }
+}
+
+class LoopLength extends ControllerModule {
+  #bars: number = 0
+  #nextBars: number = 0
+  #pressedButtons: [boolean, boolean, boolean, boolean, boolean] = [false, false, false, false, false]
+
+  init(){
+    this.bitwig.transport.clipLauncherPostRecordingAction().addValueObserver(_ => {
+      this.updateLights()
+    })
+    this.bitwig.transport.getClipLauncherPostRecordingTimeOffset().addValueObserver(_ => {
+      this.updateLights()
+    })
+    this.bitwig.transport.timeSignature().numerator().addValueObserver(_ => {
+      this.setLoopLength()
+    }, 0)
+    this.bitwig.transport.timeSignature().denominator().addValueObserver(_ => {
+      this.setLoopLength()
+    }, 0)
+  }
+
+  setLoopLength(): void {
+    const numberOfBars = this.#bars
+    const numerator = this.bitwig.transport.timeSignature().numerator().get()
+    const denominator = this.bitwig.transport.timeSignature().denominator().get()
+    this.bitwig.transport.clipLauncherPostRecordingAction().set("play_recorded")
+    this.bitwig.transport.getClipLauncherPostRecordingTimeOffset().set(4*numberOfBars*numerator/denominator)
+  }
+
+  updateLights(): void {
+    const postRecordingOffset = this.bitwig.transport.getClipLauncherPostRecordingTimeOffset().get()
+    const numerator = this.bitwig.transport.timeSignature().numerator().get()
+    const denominator = this.bitwig.transport.timeSignature().denominator().get()
+    const numberOfBars = ((postRecordingOffset/4)/numerator)*denominator
+
+    const light1 = numberOfBars%2
+    const light2 = (numberOfBars>>1) % 2
+    const light3 = (numberOfBars>>2) % 2
+    const light4 = (numberOfBars>>3) % 2
+    const light5 = (numberOfBars>>4) % 2
+
+    this.linn.setLight({row: 6, column: 0, color: light1 ? "blue" : "off"})
+    this.linn.setLight({row: 6, column: 1, color: light2 ? "blue" : "off"})
+    this.linn.setLight({row: 6, column: 2, color: light3 ? "blue" : "off"})
+    this.linn.setLight({row: 6, column: 3, color: light4 ? "blue" : "off"})
+    this.linn.setLight({row: 6, column: 4, color: light5 ? "blue" : "off"})
+  }
+
+  handleMidi(midi: MidiMessage): void {
+    println(String(midi.data1))
+
+    const noteBase = 35
+    const button = midi.data1 - noteBase
+
+    if(button < 0 || button > 4){
+      return
+    }
+
+    if(midi.type === NOTE_OFF){
+      this.#pressedButtons[button] = false
+
+      if(this.#pressedButtons.every(button => button === false)){
+        // Interaction ended
+
+        if(this.#bars == this.#nextBars){
+          // disable
+          this.#bars = 0
+        } else {
+          this.#bars = this.#nextBars
+        }
+        this.#nextBars = 0
+
+        this.setLoopLength()
+      }
+    }
+
+    if(midi.type === NOTE_ON){
+      this.#pressedButtons[button] = true
+      this.#nextBars += 1 << button
+    }
+  }
+}
+
+class LiveLoopingController {
+  bitwig: Bitwig
+  pressHandler: PressHandler
+  linn: LinnStrument
+  #modules: ControllerModule[]
+
+  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument, modules: ControllerModule[]){
+    this.bitwig = bitwig
+    this.pressHandler = pressHandler
+    this.linn = linnstrument
+    this.#modules = modules
 
     // Turn off all lights
     rowIndexes.forEach((rowIndex) => {
@@ -251,6 +353,8 @@ class LiveLoopingController {
           this.#updateClipLight(trackIndex, track, clipIndex)
         })
       }
+
+      this.#modules.forEach(module => module.init())
     }
 
     bitwig.transport.isClipLauncherOverdubEnabled().addValueObserver(overdubEnabled => {
@@ -326,6 +430,8 @@ class LiveLoopingController {
     if (type === NOTE_ON && data1 === 32) {
       this.bitwig.application.redo()
     }
+
+    this.#modules.forEach(module => module.handleMidi({type, channel, data1, data2}))
   }
 
   #updateClipLight(trackIndex: number, track: API.Track, clipIndex: number) {
@@ -371,7 +477,11 @@ function init() {
   const bitwig = new Bitwig(host)
   const linn = new LinnStrument(bitwig)
 
-  new LiveLoopingController(bitwig, pressHandler, linn)
+  const modules = [
+    new LoopLength(bitwig, pressHandler, linn)
+  ]
+
+  new LiveLoopingController(bitwig, pressHandler, linn, modules)
 
   println("LinnstrumentLooping initialized!");
 }

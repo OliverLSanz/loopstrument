@@ -12,9 +12,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _LiveLoopingController_instances, _LiveLoopingController_updateClipLight;
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.PressHandler = exports.TaskManager = void 0;
+var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _LiveLoopingController_instances, _LiveLoopingController_modules, _LiveLoopingController_updateClipLight;
 const lightColorValues = {
     default: 0,
     red: 1,
@@ -122,7 +120,6 @@ class TaskManager {
         __classPrivateFieldGet(this, _TaskManager_scheduledTasks, "f").delete(taskId);
     }
 }
-exports.TaskManager = TaskManager;
 _TaskManager_scheduledTasks = new WeakMap(), _TaskManager_host = new WeakMap();
 //                               __                   __ __
 // .-----.----.-----.-----.-----|  |--.---.-.-----.--|  |  .-----.----.
@@ -150,7 +147,6 @@ class PressHandler {
         }
     }
 }
-exports.PressHandler = PressHandler;
 //  _______  _______  __    _  _______  ______    _______  ___      ___      _______  ______
 // |       ||       ||  |  | ||       ||    _ |  |       ||   |    |   |    |       ||    _ |
 // |       ||   _   ||   |_| ||_     _||   | ||  |   _   ||   |    |   |    |    ___||   | ||
@@ -159,12 +155,97 @@ exports.PressHandler = PressHandler;
 // |     |_ |       || | |   |  |   |  |   |  | ||       ||       ||       ||   |___ |   |  | |
 // |_______||_______||_|  |__|  |___|  |___|  |_||_______||_______||_______||_______||___|  |_|
 // Avobe this all were helper classes. This is the actual controller code!
-class LiveLoopingController {
+class ControllerModule {
     constructor(bitwig, pressHandler, linnstrument) {
-        _LiveLoopingController_instances.add(this);
         this.bitwig = bitwig;
         this.pressHandler = pressHandler;
         this.linn = linnstrument;
+    }
+    init() { }
+    canHandleMidi(midi) { return false; }
+    handleMidi(midi) { }
+}
+class LoopLength extends ControllerModule {
+    constructor() {
+        super(...arguments);
+        _LoopLength_bars.set(this, 0);
+        _LoopLength_nextBars.set(this, 0);
+        _LoopLength_pressedButtons.set(this, [false, false, false, false, false]);
+    }
+    init() {
+        this.bitwig.transport.clipLauncherPostRecordingAction().addValueObserver(_ => {
+            this.updateLights();
+        });
+        this.bitwig.transport.getClipLauncherPostRecordingTimeOffset().addValueObserver(_ => {
+            this.updateLights();
+        });
+        this.bitwig.transport.timeSignature().numerator().addValueObserver(_ => {
+            this.setLoopLength();
+        }, 0);
+        this.bitwig.transport.timeSignature().denominator().addValueObserver(_ => {
+            this.setLoopLength();
+        }, 0);
+    }
+    setLoopLength() {
+        const numberOfBars = __classPrivateFieldGet(this, _LoopLength_bars, "f");
+        const numerator = this.bitwig.transport.timeSignature().numerator().get();
+        const denominator = this.bitwig.transport.timeSignature().denominator().get();
+        this.bitwig.transport.clipLauncherPostRecordingAction().set("play_recorded");
+        this.bitwig.transport.getClipLauncherPostRecordingTimeOffset().set(4 * numberOfBars * numerator / denominator);
+    }
+    updateLights() {
+        const postRecordingOffset = this.bitwig.transport.getClipLauncherPostRecordingTimeOffset().get();
+        const numerator = this.bitwig.transport.timeSignature().numerator().get();
+        const denominator = this.bitwig.transport.timeSignature().denominator().get();
+        const numberOfBars = ((postRecordingOffset / 4) / numerator) * denominator;
+        const light1 = numberOfBars % 2;
+        const light2 = (numberOfBars >> 1) % 2;
+        const light3 = (numberOfBars >> 2) % 2;
+        const light4 = (numberOfBars >> 3) % 2;
+        const light5 = (numberOfBars >> 4) % 2;
+        this.linn.setLight({ row: 6, column: 0, color: light1 ? "blue" : "off" });
+        this.linn.setLight({ row: 6, column: 1, color: light2 ? "blue" : "off" });
+        this.linn.setLight({ row: 6, column: 2, color: light3 ? "blue" : "off" });
+        this.linn.setLight({ row: 6, column: 3, color: light4 ? "blue" : "off" });
+        this.linn.setLight({ row: 6, column: 4, color: light5 ? "blue" : "off" });
+    }
+    handleMidi(midi) {
+        println(String(midi.data1));
+        const noteBase = 35;
+        const button = midi.data1 - noteBase;
+        if (button < 0 || button > 4) {
+            return;
+        }
+        if (midi.type === NOTE_OFF) {
+            __classPrivateFieldGet(this, _LoopLength_pressedButtons, "f")[button] = false;
+            if (__classPrivateFieldGet(this, _LoopLength_pressedButtons, "f").every(button => button === false)) {
+                // Interaction ended
+                if (__classPrivateFieldGet(this, _LoopLength_bars, "f") == __classPrivateFieldGet(this, _LoopLength_nextBars, "f")) {
+                    // disable
+                    __classPrivateFieldSet(this, _LoopLength_bars, 0, "f");
+                }
+                else {
+                    __classPrivateFieldSet(this, _LoopLength_bars, __classPrivateFieldGet(this, _LoopLength_nextBars, "f"), "f");
+                }
+                __classPrivateFieldSet(this, _LoopLength_nextBars, 0, "f");
+                this.setLoopLength();
+            }
+        }
+        if (midi.type === NOTE_ON) {
+            __classPrivateFieldGet(this, _LoopLength_pressedButtons, "f")[button] = true;
+            __classPrivateFieldSet(this, _LoopLength_nextBars, __classPrivateFieldGet(this, _LoopLength_nextBars, "f") + (1 << button), "f");
+        }
+    }
+}
+_LoopLength_bars = new WeakMap(), _LoopLength_nextBars = new WeakMap(), _LoopLength_pressedButtons = new WeakMap();
+class LiveLoopingController {
+    constructor(bitwig, pressHandler, linnstrument, modules) {
+        _LiveLoopingController_instances.add(this);
+        _LiveLoopingController_modules.set(this, void 0);
+        this.bitwig = bitwig;
+        this.pressHandler = pressHandler;
+        this.linn = linnstrument;
+        __classPrivateFieldSet(this, _LiveLoopingController_modules, modules, "f");
         // Turn off all lights
         rowIndexes.forEach((rowIndex) => {
             columnIndexes.forEach((columnIndex) => {
@@ -195,6 +276,7 @@ class LiveLoopingController {
                     __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_updateClipLight).call(this, trackIndex, track, clipIndex);
                 });
             }
+            __classPrivateFieldGet(this, _LiveLoopingController_modules, "f").forEach(module => module.init());
         }
         bitwig.transport.isClipLauncherOverdubEnabled().addValueObserver(overdubEnabled => {
             this.linn.setLight({ row: 7, column: 0, color: overdubEnabled ? "red" : "white" });
@@ -257,9 +339,10 @@ class LiveLoopingController {
         if (type === NOTE_ON && data1 === 32) {
             this.bitwig.application.redo();
         }
+        __classPrivateFieldGet(this, _LiveLoopingController_modules, "f").forEach(module => module.handleMidi({ type, channel, data1, data2 }));
     }
 }
-_LiveLoopingController_instances = new WeakSet(), _LiveLoopingController_updateClipLight = function _LiveLoopingController_updateClipLight(trackIndex, track, clipIndex) {
+_LiveLoopingController_modules = new WeakMap(), _LiveLoopingController_instances = new WeakSet(), _LiveLoopingController_updateClipLight = function _LiveLoopingController_updateClipLight(trackIndex, track, clipIndex) {
     const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
     if (clip.isRecording().getAsBoolean()) {
         this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "red" });
@@ -293,7 +376,10 @@ function init() {
     const pressHandler = new PressHandler(taskManager);
     const bitwig = new Bitwig(host);
     const linn = new LinnStrument(bitwig);
-    new LiveLoopingController(bitwig, pressHandler, linn);
+    const modules = [
+        new LoopLength(bitwig, pressHandler, linn)
+    ];
+    new LiveLoopingController(bitwig, pressHandler, linn, modules);
     println("LinnstrumentLooping initialized!");
 }
 function flush() {
