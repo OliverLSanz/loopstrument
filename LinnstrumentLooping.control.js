@@ -12,7 +12,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _LiveLoopingController_instances, _LiveLoopingController_modules, _LiveLoopingController_updateClipLight;
+var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ClipArray_instances, _ClipArray_updateClipLight, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _LiveLoopingController_modules;
 const lightColorValues = {
     default: 0,
     red: 1,
@@ -162,9 +162,104 @@ class ControllerModule {
         this.linn = linnstrument;
     }
     init() { }
-    canHandleMidi(midi) { return false; }
-    handleMidi(midi) { }
+    handleMidi(midi) { return false; }
 }
+class TracksRow extends ControllerModule {
+    init() {
+        for (let trackIndex = 0; trackIndex < 5; trackIndex++) {
+            const track = this.bitwig.tracks.getItemAt(trackIndex);
+            track.arm().addValueObserver((isArmed) => {
+                this.linn.setLight({ row: 0, column: trackIndex, color: isArmed ? "magenta" : "off" });
+            });
+        }
+    }
+    handleMidi(midi) {
+        // SWITCH TRACKS
+        if (midi.type === NOTE_ON && midi.data1 === 65) {
+            this.bitwig.armTrack(0);
+        }
+        if (midi.type === NOTE_ON && midi.data1 === 66) {
+            this.bitwig.armTrack(1);
+        }
+        if (midi.type === NOTE_ON && midi.data1 === 67) {
+            this.bitwig.armTrack(2);
+        }
+        if (midi.type === NOTE_ON && midi.data1 === 68) {
+            this.bitwig.armTrack(3);
+        }
+        if (midi.type === NOTE_ON && midi.data1 === 69) {
+            this.bitwig.armTrack(4);
+        }
+        return false;
+    }
+}
+class ClipArray extends ControllerModule {
+    constructor() {
+        super(...arguments);
+        _ClipArray_instances.add(this);
+    }
+    init() {
+        // Start observers
+        for (let trackIndex = 0; trackIndex < 5; trackIndex++) {
+            const track = this.bitwig.tracks.getItemAt(trackIndex);
+            for (let clipIndex = 0; clipIndex < 3; clipIndex++) {
+                const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
+                clip.isPlaying().addValueObserver((_) => {
+                    __classPrivateFieldGet(this, _ClipArray_instances, "m", _ClipArray_updateClipLight).call(this, trackIndex, track, clipIndex);
+                });
+                clip.isRecording().addValueObserver((_) => {
+                    __classPrivateFieldGet(this, _ClipArray_instances, "m", _ClipArray_updateClipLight).call(this, trackIndex, track, clipIndex);
+                });
+                clip.hasContent().addValueObserver((_) => {
+                    __classPrivateFieldGet(this, _ClipArray_instances, "m", _ClipArray_updateClipLight).call(this, trackIndex, track, clipIndex);
+                });
+            }
+        }
+    }
+    handleMidi(midi) {
+        if (midi.type === NOTE_ON && midi.data1 >= 50 && midi.data1 <= 64) {
+            const trackIndex = midi.data1 % 5;
+            const track = this.bitwig.tracks.getItemAt(trackIndex);
+            const clipIndex = Math.floor(Math.abs(midi.data1 - 64) / 5);
+            const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
+            function onTap() {
+                if (clip.isPlaying().getAsBoolean()) {
+                    track.stop();
+                }
+                else {
+                    clip.launch();
+                }
+            }
+            function onLongPress() {
+                clip.deleteObject();
+            }
+            this.pressHandler.handlePressBegin(onTap, onLongPress, 1000, midi.data1);
+            return true;
+        }
+        if (midi.type === NOTE_OFF && midi.data1 >= 50 && midi.data1 <= 64) {
+            this.pressHandler.handlePressEnd(midi.data1);
+            return true;
+        }
+        return false;
+    }
+}
+_ClipArray_instances = new WeakSet(), _ClipArray_updateClipLight = function _ClipArray_updateClipLight(trackIndex, track, clipIndex) {
+    const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
+    if (clip.isRecording().getAsBoolean()) {
+        this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "red" });
+        return;
+    }
+    if (clip.isPlaying().getAsBoolean()) {
+        this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "blue" });
+        return;
+    }
+    if (clip.hasContent().getAsBoolean()) {
+        this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "white" });
+        return;
+    }
+    // Clip is empty
+    this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "off" });
+};
 class LoopLength extends ControllerModule {
     constructor() {
         super(...arguments);
@@ -214,7 +309,7 @@ class LoopLength extends ControllerModule {
         const noteBase = 35;
         const button = midi.data1 - noteBase;
         if (button < 0 || button > 4) {
-            return;
+            return false;
         }
         if (midi.type === NOTE_OFF) {
             __classPrivateFieldGet(this, _LoopLength_pressedButtons, "f")[button] = false;
@@ -230,17 +325,53 @@ class LoopLength extends ControllerModule {
                 __classPrivateFieldSet(this, _LoopLength_nextBars, 0, "f");
                 this.setLoopLength();
             }
+            return true;
         }
         if (midi.type === NOTE_ON) {
             __classPrivateFieldGet(this, _LoopLength_pressedButtons, "f")[button] = true;
             __classPrivateFieldSet(this, _LoopLength_nextBars, __classPrivateFieldGet(this, _LoopLength_nextBars, "f") + (1 << button), "f");
+            return true;
         }
+        return false;
     }
 }
 _LoopLength_bars = new WeakMap(), _LoopLength_nextBars = new WeakMap(), _LoopLength_pressedButtons = new WeakMap();
+class UndoRedo extends ControllerModule {
+    init() {
+        // set undo button light
+        this.linn.setLight({ row: 7, column: 1, color: "magenta" });
+        // set redo button light
+        this.linn.setLight({ row: 7, column: 2, color: "blue" });
+    }
+    handleMidi(midi) {
+        if (midi.type === NOTE_ON && midi.data1 === 31) {
+            this.bitwig.application.undo();
+            return true;
+        }
+        if (midi.type === NOTE_ON && midi.data1 === 32) {
+            this.bitwig.application.redo();
+            return true;
+        }
+        return false;
+    }
+}
+class OverdubToggle extends ControllerModule {
+    init() {
+        this.bitwig.transport.isClipLauncherOverdubEnabled().addValueObserver(overdubEnabled => {
+            this.linn.setLight({ row: 7, column: 0, color: overdubEnabled ? "red" : "white" });
+        });
+    }
+    handleMidi(midi) {
+        if (midi.type === NOTE_ON && midi.data1 === 30) {
+            const overdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().getAsBoolean();
+            this.bitwig.transport.isClipLauncherOverdubEnabled().set(!overdubEnabled);
+            return true;
+        }
+        return false;
+    }
+}
 class LiveLoopingController {
     constructor(bitwig, pressHandler, linnstrument, modules) {
-        _LiveLoopingController_instances.add(this);
         _LiveLoopingController_modules.set(this, void 0);
         this.bitwig = bitwig;
         this.pressHandler = pressHandler;
@@ -252,113 +383,22 @@ class LiveLoopingController {
                 this.linn.setLight({ row: rowIndex, column: columnIndex, color: "off" });
             });
         });
-        // set undo button light
-        this.linn.setLight({ row: 7, column: 1, color: "magenta" });
-        // set redo button light
-        this.linn.setLight({ row: 7, column: 2, color: "blue" });
-        // Start observers
-        for (let trackIndex = 0; trackIndex < 5; trackIndex++) {
-            const track = bitwig.tracks.getItemAt(trackIndex);
-            track.isStopped().markInterested();
-            track.isActivated().markInterested();
-            track.arm().addValueObserver((isArmed) => {
-                this.linn.setLight({ row: 0, column: trackIndex, color: isArmed ? "magenta" : "off" });
-            });
-            for (let clipIndex = 0; clipIndex < 3; clipIndex++) {
-                const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
-                clip.isPlaying().addValueObserver((_) => {
-                    __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_updateClipLight).call(this, trackIndex, track, clipIndex);
-                });
-                clip.isRecording().addValueObserver((_) => {
-                    __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_updateClipLight).call(this, trackIndex, track, clipIndex);
-                });
-                clip.hasContent().addValueObserver((_) => {
-                    __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_updateClipLight).call(this, trackIndex, track, clipIndex);
-                });
-            }
-            __classPrivateFieldGet(this, _LiveLoopingController_modules, "f").forEach(module => module.init());
-        }
-        bitwig.transport.isClipLauncherOverdubEnabled().addValueObserver(overdubEnabled => {
-            this.linn.setLight({ row: 7, column: 0, color: overdubEnabled ? "red" : "white" });
-        });
         this.bitwig.host.getMidiInPort(0).setMidiCallback((...args) => this.handleMidi(...args));
         // Channel 0: Used to control bitwig
         // Channels 1-15: Used for MPE
         this.bitwig.host.getMidiInPort(0)
             .createNoteInput("LinnStrument", "?1????", "?2????", "?3????", "?4????", "?5????", "?6????", "?7????", "?8????", "?9????", "?A????", "?B????", "?C????", "?D????", "?E????", "?F????")
             .setUseExpressiveMidi(true, 0, 48);
+        __classPrivateFieldGet(this, _LiveLoopingController_modules, "f").forEach(module => module.init());
     }
     handleMidi(status, data1, data2) {
         const type = status >> 4;
         const channel = status % 16;
-        // SWITCH TRACKS
-        if (type === NOTE_ON && data1 === 65) {
-            this.bitwig.armTrack(0);
-        }
-        if (type === NOTE_ON && data1 === 66) {
-            this.bitwig.armTrack(1);
-        }
-        if (type === NOTE_ON && data1 === 67) {
-            this.bitwig.armTrack(2);
-        }
-        if (type === NOTE_ON && data1 === 68) {
-            this.bitwig.armTrack(3);
-        }
-        if (type === NOTE_ON && data1 === 69) {
-            this.bitwig.armTrack(4);
-        }
-        // CLIPS
-        if (type === NOTE_ON && data1 >= 50 && data1 <= 64) {
-            const trackIndex = data1 % 5;
-            const track = this.bitwig.tracks.getItemAt(trackIndex);
-            const clipIndex = Math.floor(Math.abs(data1 - 64) / 5);
-            const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
-            function onTap() {
-                if (clip.isPlaying().getAsBoolean()) {
-                    track.stop();
-                }
-                else {
-                    clip.launch();
-                }
-            }
-            function onLongPress() {
-                clip.deleteObject();
-            }
-            this.pressHandler.handlePressBegin(onTap, onLongPress, 1000, data1);
-        }
-        if (type === NOTE_OFF && data1 >= 50 && data1 <= 64) {
-            this.pressHandler.handlePressEnd(data1);
-        }
-        if (type === NOTE_ON && data1 === 30) {
-            const overdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().getAsBoolean();
-            this.bitwig.transport.isClipLauncherOverdubEnabled().set(!overdubEnabled);
-        }
-        if (type === NOTE_ON && data1 === 31) {
-            this.bitwig.application.undo();
-        }
-        if (type === NOTE_ON && data1 === 32) {
-            this.bitwig.application.redo();
-        }
-        __classPrivateFieldGet(this, _LiveLoopingController_modules, "f").forEach(module => module.handleMidi({ type, channel, data1, data2 }));
+        // Pass the midi message to each module.handleMidi until one returns true
+        __classPrivateFieldGet(this, _LiveLoopingController_modules, "f").some(module => module.handleMidi({ type, channel, data1, data2 }));
     }
 }
-_LiveLoopingController_modules = new WeakMap(), _LiveLoopingController_instances = new WeakSet(), _LiveLoopingController_updateClipLight = function _LiveLoopingController_updateClipLight(trackIndex, track, clipIndex) {
-    const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
-    if (clip.isRecording().getAsBoolean()) {
-        this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "red" });
-        return;
-    }
-    if (clip.isPlaying().getAsBoolean()) {
-        this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "blue" });
-        return;
-    }
-    if (clip.hasContent().getAsBoolean()) {
-        this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "white" });
-        return;
-    }
-    // Clip is empty
-    this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "off" });
-};
+_LiveLoopingController_modules = new WeakMap();
 //  _______  _______  ______    ___   _______  _______
 // |       ||       ||    _ |  |   | |       ||       |
 // |  _____||       ||   | ||  |   | |    _  ||_     _|
@@ -377,7 +417,11 @@ function init() {
     const bitwig = new Bitwig(host);
     const linn = new LinnStrument(bitwig);
     const modules = [
-        new LoopLength(bitwig, pressHandler, linn)
+        new TracksRow(bitwig, pressHandler, linn),
+        new ClipArray(bitwig, pressHandler, linn),
+        new LoopLength(bitwig, pressHandler, linn),
+        new OverdubToggle(bitwig, pressHandler, linn),
+        new UndoRedo(bitwig, pressHandler, linn),
     ];
     new LiveLoopingController(bitwig, pressHandler, linn, modules);
     println("LinnstrumentLooping initialized!");

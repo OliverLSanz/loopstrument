@@ -220,9 +220,115 @@ class ControllerModule {
 
   init(): void{ }
 
-  canHandleMidi(midi: MidiMessage): boolean { return false }
+  handleMidi(midi: MidiMessage): boolean { return false }
+}
 
-  handleMidi(midi: MidiMessage): void { }
+class TracksRow extends ControllerModule {
+  init(): void {
+    for (let trackIndex = 0; trackIndex < 5; trackIndex++) {
+      const track = this.bitwig.tracks.getItemAt(trackIndex)
+
+      track.arm().addValueObserver((isArmed: boolean) => {
+        this.linn.setLight({ row: 0 as row, column: trackIndex, color: isArmed ? "magenta" : "off" })
+      })
+    }
+  }
+
+  handleMidi(midi: MidiMessage): boolean {
+    // SWITCH TRACKS
+    if (midi.type === NOTE_ON && midi.data1 === 65) {
+      this.bitwig.armTrack(0)
+    }
+    if (midi.type === NOTE_ON && midi.data1 === 66) {
+      this.bitwig.armTrack(1)
+    }
+    if (midi.type === NOTE_ON && midi.data1 === 67) {
+      this.bitwig.armTrack(2)
+    }
+    if (midi.type === NOTE_ON && midi.data1 === 68) {
+      this.bitwig.armTrack(3)
+    }
+    if (midi.type === NOTE_ON && midi.data1 === 69) {
+      this.bitwig.armTrack(4)
+    }
+
+    return false
+  }
+}
+
+class ClipArray extends ControllerModule {
+  init(): void{
+    // Start observers
+    for (let trackIndex = 0; trackIndex < 5; trackIndex++) {
+      const track = this.bitwig.tracks.getItemAt(trackIndex)
+
+      for (let clipIndex = 0; clipIndex < 3; clipIndex++) {
+        const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
+
+        clip.isPlaying().addValueObserver((_) => {
+          this.#updateClipLight(trackIndex, track, clipIndex)
+        })
+        clip.isRecording().addValueObserver((_) => {
+          this.#updateClipLight(trackIndex, track, clipIndex)
+        })
+        clip.hasContent().addValueObserver((_) => {
+          this.#updateClipLight(trackIndex, track, clipIndex)
+        })
+      }
+    }
+  }
+
+  handleMidi(midi: MidiMessage): boolean {
+    if (midi.type === NOTE_ON && midi.data1 >= 50 && midi.data1 <= 64) {
+      const trackIndex = midi.data1 % 5
+      const track = this.bitwig.tracks.getItemAt(trackIndex)
+      const clipIndex = Math.floor(Math.abs(midi.data1 - 64) / 5)
+      const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
+
+      function onTap() {
+        if (clip.isPlaying().getAsBoolean()) {
+          track.stop()
+        } else {
+          clip.launch()
+        }
+      }
+
+      function onLongPress() {
+        clip.deleteObject()
+      }
+
+      this.pressHandler.handlePressBegin(onTap, onLongPress, 1000, midi.data1)
+
+      return true
+    }
+
+    if (midi.type === NOTE_OFF && midi.data1 >= 50 && midi.data1 <= 64) {
+      this.pressHandler.handlePressEnd(midi.data1)
+
+      return true
+    }
+
+    return false
+  }
+
+  #updateClipLight(trackIndex: number, track: API.Track, clipIndex: number) {
+    const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
+
+    if (clip.isRecording().getAsBoolean()) {
+      this.linn.setLight({ row: clipIndex + 1 as row, column: trackIndex, color: "red" })
+      return
+    }
+    if (clip.isPlaying().getAsBoolean()) {
+      this.linn.setLight({ row: clipIndex + 1 as row, column: trackIndex, color: "blue" })
+      return
+    }
+    if (clip.hasContent().getAsBoolean()) {
+      this.linn.setLight({ row: clipIndex + 1 as row, column: trackIndex, color: "white" })
+      return
+    }
+    // Clip is empty
+    this.linn.setLight({ row: clipIndex + 1 as row, column: trackIndex, color: "off" })
+  }
 }
 
 class LoopLength extends ControllerModule {
@@ -272,14 +378,14 @@ class LoopLength extends ControllerModule {
     this.linn.setLight({row: 6, column: 4, color: light5 ? "blue" : "off"})
   }
 
-  handleMidi(midi: MidiMessage): void {
+  handleMidi(midi: MidiMessage): boolean {
     println(String(midi.data1))
 
     const noteBase = 35
     const button = midi.data1 - noteBase
 
     if(button < 0 || button > 4){
-      return
+      return false
     }
 
     if(midi.type === NOTE_OFF){
@@ -298,12 +404,58 @@ class LoopLength extends ControllerModule {
 
         this.setLoopLength()
       }
+
+      return true
     }
 
     if(midi.type === NOTE_ON){
       this.#pressedButtons[button] = true
       this.#nextBars += 1 << button
+
+      return true
     }
+
+    return false
+  }
+}
+
+class UndoRedo extends ControllerModule {
+  init(): void {
+    // set undo button light
+    this.linn.setLight({ row: 7, column: 1, color: "magenta" })
+    // set redo button light
+    this.linn.setLight({ row: 7, column: 2, color: "blue" })
+  }
+
+  handleMidi(midi: MidiMessage): boolean {
+    if (midi.type === NOTE_ON && midi.data1 === 31) {
+      this.bitwig.application.undo()
+      return true
+    }
+
+    if (midi.type === NOTE_ON && midi.data1 === 32) {
+      this.bitwig.application.redo()
+      return true
+    }
+
+    return false
+  }
+}
+
+class OverdubToggle extends ControllerModule {
+  init(): void {
+    this.bitwig.transport.isClipLauncherOverdubEnabled().addValueObserver(overdubEnabled => {
+      this.linn.setLight({ row: 7, column: 0, color: overdubEnabled ? "red" : "white" })
+    })
+  }
+
+  handleMidi(midi: MidiMessage): boolean {
+    if (midi.type === NOTE_ON && midi.data1 === 30) {
+      const overdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().getAsBoolean()
+      this.bitwig.transport.isClipLauncherOverdubEnabled().set(!overdubEnabled)
+      return true
+    }
+    return false
   }
 }
 
@@ -325,41 +477,6 @@ class LiveLoopingController {
         this.linn.setLight({ row: rowIndex, column: columnIndex, color: "off" })
       })
     })
-    // set undo button light
-    this.linn.setLight({ row: 7, column: 1, color: "magenta" })
-    // set redo button light
-    this.linn.setLight({ row: 7, column: 2, color: "blue" })
-
-    // Start observers
-    for (let trackIndex = 0; trackIndex < 5; trackIndex++) {
-      const track = bitwig.tracks.getItemAt(trackIndex)
-      track.isStopped().markInterested()
-      track.isActivated().markInterested()
-
-      track.arm().addValueObserver((isArmed: boolean) => {
-        this.linn.setLight({ row: 0 as row, column: trackIndex, color: isArmed ? "magenta" : "off" })
-      })
-
-      for (let clipIndex = 0; clipIndex < 3; clipIndex++) {
-        const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
-
-        clip.isPlaying().addValueObserver((_) => {
-          this.#updateClipLight(trackIndex, track, clipIndex)
-        })
-        clip.isRecording().addValueObserver((_) => {
-          this.#updateClipLight(trackIndex, track, clipIndex)
-        })
-        clip.hasContent().addValueObserver((_) => {
-          this.#updateClipLight(trackIndex, track, clipIndex)
-        })
-      }
-
-      this.#modules.forEach(module => module.init())
-    }
-
-    bitwig.transport.isClipLauncherOverdubEnabled().addValueObserver(overdubEnabled => {
-      this.linn.setLight({ row: 7, column: 0, color: overdubEnabled ? "red" : "white" })
-    })
 
     this.bitwig.host.getMidiInPort(0).setMidiCallback((...args) => this.handleMidi(...args));
 
@@ -370,87 +487,16 @@ class LiveLoopingController {
         "?5????", "?6????", "?7????", "?8????", "?9????", "?A????",
         "?B????", "?C????", "?D????", "?E????", "?F????")
       .setUseExpressiveMidi(true, 0, 48);
+
+    this.#modules.forEach(module => module.init())
   }
 
   handleMidi(status: number, data1: number, data2: number){
     const type = status >> 4
     const channel = status % 16
-    // SWITCH TRACKS
-    if (type === NOTE_ON && data1 === 65) {
-      this.bitwig.armTrack(0)
-    }
-    if (type === NOTE_ON && data1 === 66) {
-      this.bitwig.armTrack(1)
-    }
-    if (type === NOTE_ON && data1 === 67) {
-      this.bitwig.armTrack(2)
-    }
-    if (type === NOTE_ON && data1 === 68) {
-      this.bitwig.armTrack(3)
-    }
-    if (type === NOTE_ON && data1 === 69) {
-      this.bitwig.armTrack(4)
-    }
 
-    // CLIPS
-    if (type === NOTE_ON && data1 >= 50 && data1 <= 64) {
-      const trackIndex = data1 % 5
-      const track = this.bitwig.tracks.getItemAt(trackIndex)
-      const clipIndex = Math.floor(Math.abs(data1 - 64) / 5)
-      const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
-
-      function onTap() {
-        if (clip.isPlaying().getAsBoolean()) {
-          track.stop()
-        } else {
-          clip.launch()
-        }
-      }
-
-      function onLongPress() {
-        clip.deleteObject()
-      }
-
-      this.pressHandler.handlePressBegin(onTap, onLongPress, 1000, data1)
-    }
-
-    if (type === NOTE_OFF && data1 >= 50 && data1 <= 64) {
-      this.pressHandler.handlePressEnd(data1)
-    }
-
-    if (type === NOTE_ON && data1 === 30) {
-      const overdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().getAsBoolean()
-      this.bitwig.transport.isClipLauncherOverdubEnabled().set(!overdubEnabled)
-    }
-
-    if (type === NOTE_ON && data1 === 31) {
-      this.bitwig.application.undo()
-    }
-
-    if (type === NOTE_ON && data1 === 32) {
-      this.bitwig.application.redo()
-    }
-
-    this.#modules.forEach(module => module.handleMidi({type, channel, data1, data2}))
-  }
-
-  #updateClipLight(trackIndex: number, track: API.Track, clipIndex: number) {
-    const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
-
-    if (clip.isRecording().getAsBoolean()) {
-      this.linn.setLight({ row: clipIndex + 1 as row, column: trackIndex, color: "red" })
-      return
-    }
-    if (clip.isPlaying().getAsBoolean()) {
-      this.linn.setLight({ row: clipIndex + 1 as row, column: trackIndex, color: "blue" })
-      return
-    }
-    if (clip.hasContent().getAsBoolean()) {
-      this.linn.setLight({ row: clipIndex + 1 as row, column: trackIndex, color: "white" })
-      return
-    }
-    // Clip is empty
-    this.linn.setLight({ row: clipIndex + 1 as row, column: trackIndex, color: "off" })
+    // Pass the midi message to each module.handleMidi until one returns true
+    this.#modules.some(module => module.handleMidi({type, channel, data1, data2}))
   }
 }
 
@@ -478,7 +524,11 @@ function init() {
   const linn = new LinnStrument(bitwig)
 
   const modules = [
-    new LoopLength(bitwig, pressHandler, linn)
+    new TracksRow(bitwig, pressHandler, linn),
+    new ClipArray(bitwig, pressHandler, linn),
+    new LoopLength(bitwig, pressHandler, linn),
+    new OverdubToggle(bitwig, pressHandler, linn),
+    new UndoRedo(bitwig, pressHandler, linn),
   ]
 
   new LiveLoopingController(bitwig, pressHandler, linn, modules)
