@@ -12,7 +12,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ClipArray_instances, _ClipArray_updateClipLight, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _LiveLoopingController_modules;
+var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ControllerModule_onUpdate, _ClipArray_instances, _ClipArray_updateClipLight, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _LiveLoopingController_interfaceEnabled, _LiveLoopingController_noteInput, _LiveLoopingController_linn, _LiveLoopingController_modules;
 const lightColorValues = {
     default: 0,
     red: 1,
@@ -96,6 +96,20 @@ class LinnStrument {
         // 22 to set color, 1 is red
         __classPrivateFieldGet(this, _LinnStrument_bitwig, "f").midiOut({ type: CC, channel: 0, data1: 22, data2: lightColorValues[color] });
     }
+    resetLights() {
+        rowIndexes.forEach(row => {
+            columnIndexes.forEach(column => {
+                this.setLight({ row, column, color: "default" });
+            });
+        });
+    }
+    turnOffLights() {
+        rowIndexes.forEach(row => {
+            columnIndexes.forEach(column => {
+                this.setLight({ row, column, color: "off" });
+            });
+        });
+    }
 }
 _LinnStrument_bitwig = new WeakMap();
 class TaskManager {
@@ -156,20 +170,36 @@ class PressHandler {
 // |_______||_______||_|  |__|  |___|  |___|  |_||_______||_______||_______||_______||___|  |_|
 // Avobe this all were helper classes. This is the actual controller code!
 class ControllerModule {
-    constructor(bitwig, pressHandler, linnstrument) {
+    constructor(bitwig, pressHandler, linnstrument, controller) {
+        _ControllerModule_onUpdate.set(this, void 0);
         this.bitwig = bitwig;
         this.pressHandler = pressHandler;
         this.linn = linnstrument;
+        this.controller = controller;
+        __classPrivateFieldSet(this, _ControllerModule_onUpdate, [], "f");
     }
     init() { }
+    update() {
+        __classPrivateFieldGet(this, _ControllerModule_onUpdate, "f").forEach(callback => callback());
+    }
     handleMidi(midi) { return false; }
+    addValueObserver(subject, callback) {
+        subject.addValueObserver(callback);
+        __classPrivateFieldGet(this, _ControllerModule_onUpdate, "f").push(callback);
+    }
+    addInitCallback(callback) {
+        callback();
+        __classPrivateFieldGet(this, _ControllerModule_onUpdate, "f").push(callback);
+    }
 }
+_ControllerModule_onUpdate = new WeakMap();
 class TracksRow extends ControllerModule {
     init() {
         for (let trackIndex = 0; trackIndex < 5; trackIndex++) {
             const track = this.bitwig.tracks.getItemAt(trackIndex);
-            track.arm().addValueObserver((isArmed) => {
-                this.linn.setLight({ row: 0, column: trackIndex, color: isArmed ? "magenta" : "off" });
+            this.addValueObserver(track.arm(), () => {
+                const isArmed = track.arm().get();
+                this.controller.setLight({ row: 0, column: trackIndex, color: isArmed ? "magenta" : "off" });
             });
         }
     }
@@ -204,13 +234,16 @@ class ClipArray extends ControllerModule {
             const track = this.bitwig.tracks.getItemAt(trackIndex);
             for (let clipIndex = 0; clipIndex < 3; clipIndex++) {
                 const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
-                clip.isPlaying().addValueObserver((_) => {
+                this.addValueObserver(clip.isPlaying(), () => {
                     __classPrivateFieldGet(this, _ClipArray_instances, "m", _ClipArray_updateClipLight).call(this, trackIndex, track, clipIndex);
                 });
-                clip.isRecording().addValueObserver((_) => {
+                this.addValueObserver(clip.isPlaying(), () => {
                     __classPrivateFieldGet(this, _ClipArray_instances, "m", _ClipArray_updateClipLight).call(this, trackIndex, track, clipIndex);
                 });
-                clip.hasContent().addValueObserver((_) => {
+                this.addValueObserver(clip.isRecording(), () => {
+                    __classPrivateFieldGet(this, _ClipArray_instances, "m", _ClipArray_updateClipLight).call(this, trackIndex, track, clipIndex);
+                });
+                this.addValueObserver(clip.hasContent(), () => {
                     __classPrivateFieldGet(this, _ClipArray_instances, "m", _ClipArray_updateClipLight).call(this, trackIndex, track, clipIndex);
                 });
             }
@@ -246,19 +279,19 @@ class ClipArray extends ControllerModule {
 _ClipArray_instances = new WeakSet(), _ClipArray_updateClipLight = function _ClipArray_updateClipLight(trackIndex, track, clipIndex) {
     const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
     if (clip.isRecording().getAsBoolean()) {
-        this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "red" });
+        this.controller.setLight({ row: clipIndex + 1, column: trackIndex, color: "red" });
         return;
     }
     if (clip.isPlaying().getAsBoolean()) {
-        this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "blue" });
+        this.controller.setLight({ row: clipIndex + 1, column: trackIndex, color: "blue" });
         return;
     }
     if (clip.hasContent().getAsBoolean()) {
-        this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "white" });
+        this.controller.setLight({ row: clipIndex + 1, column: trackIndex, color: "white" });
         return;
     }
     // Clip is empty
-    this.linn.setLight({ row: clipIndex + 1, column: trackIndex, color: "off" });
+    this.controller.setLight({ row: clipIndex + 1, column: trackIndex, color: "off" });
 };
 class LoopLength extends ControllerModule {
     constructor() {
@@ -268,18 +301,18 @@ class LoopLength extends ControllerModule {
         _LoopLength_pressedButtons.set(this, [false, false, false, false, false]);
     }
     init() {
-        this.bitwig.transport.clipLauncherPostRecordingAction().addValueObserver(_ => {
+        this.addValueObserver(this.bitwig.transport.clipLauncherPostRecordingAction(), () => {
             this.updateLights();
         });
-        this.bitwig.transport.getClipLauncherPostRecordingTimeOffset().addValueObserver(_ => {
+        this.addValueObserver(this.bitwig.transport.getClipLauncherPostRecordingTimeOffset(), () => {
             this.updateLights();
         });
-        this.bitwig.transport.timeSignature().numerator().addValueObserver(_ => {
+        this.addValueObserver(this.bitwig.transport.timeSignature().numerator(), () => {
             this.setLoopLength();
-        }, 0);
-        this.bitwig.transport.timeSignature().denominator().addValueObserver(_ => {
+        });
+        this.addValueObserver(this.bitwig.transport.timeSignature().denominator(), () => {
             this.setLoopLength();
-        }, 0);
+        });
     }
     setLoopLength() {
         const numberOfBars = __classPrivateFieldGet(this, _LoopLength_bars, "f");
@@ -298,11 +331,11 @@ class LoopLength extends ControllerModule {
         const light3 = (numberOfBars >> 2) % 2;
         const light4 = (numberOfBars >> 3) % 2;
         const light5 = (numberOfBars >> 4) % 2;
-        this.linn.setLight({ row: 6, column: 0, color: light1 ? "blue" : "off" });
-        this.linn.setLight({ row: 6, column: 1, color: light2 ? "blue" : "off" });
-        this.linn.setLight({ row: 6, column: 2, color: light3 ? "blue" : "off" });
-        this.linn.setLight({ row: 6, column: 3, color: light4 ? "blue" : "off" });
-        this.linn.setLight({ row: 6, column: 4, color: light5 ? "blue" : "off" });
+        this.controller.setLight({ row: 6, column: 0, color: light1 ? "blue" : "off" });
+        this.controller.setLight({ row: 6, column: 1, color: light2 ? "blue" : "off" });
+        this.controller.setLight({ row: 6, column: 2, color: light3 ? "blue" : "off" });
+        this.controller.setLight({ row: 6, column: 3, color: light4 ? "blue" : "off" });
+        this.controller.setLight({ row: 6, column: 4, color: light5 ? "blue" : "off" });
     }
     handleMidi(midi) {
         println(String(midi.data1));
@@ -338,10 +371,12 @@ class LoopLength extends ControllerModule {
 _LoopLength_bars = new WeakMap(), _LoopLength_nextBars = new WeakMap(), _LoopLength_pressedButtons = new WeakMap();
 class UndoRedo extends ControllerModule {
     init() {
-        // set undo button light
-        this.linn.setLight({ row: 7, column: 1, color: "magenta" });
-        // set redo button light
-        this.linn.setLight({ row: 7, column: 2, color: "blue" });
+        this.addInitCallback(() => {
+            // set undo button light
+            this.controller.setLight({ row: 7, column: 1, color: "magenta" });
+            // set redo button light
+            this.controller.setLight({ row: 7, column: 2, color: "blue" });
+        });
     }
     handleMidi(midi) {
         if (midi.type === NOTE_ON && midi.data1 === 31) {
@@ -357,8 +392,9 @@ class UndoRedo extends ControllerModule {
 }
 class OverdubToggle extends ControllerModule {
     init() {
-        this.bitwig.transport.isClipLauncherOverdubEnabled().addValueObserver(overdubEnabled => {
-            this.linn.setLight({ row: 7, column: 0, color: overdubEnabled ? "red" : "white" });
+        this.addValueObserver(this.bitwig.transport.isClipLauncherOverdubEnabled(), () => {
+            const isOverdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().get();
+            this.controller.setLight({ row: 7, column: 0, color: isOverdubEnabled ? "red" : "white" });
         });
     }
     handleMidi(midi) {
@@ -370,26 +406,57 @@ class OverdubToggle extends ControllerModule {
         return false;
     }
 }
+class InterfaceToggle extends ControllerModule {
+    init() {
+        this.addInitCallback(() => {
+            if (this.controller.isInterfaceEnabled()) {
+                println("EL DE ARRIBA");
+                this.controller.setLight({ row: 7, column: 3, color: 'yellow' });
+            }
+            else {
+                println("EL DE ABAJO");
+                this.controller.setLight({ row: 7, column: 0, color: 'yellow' }, true);
+            }
+        });
+    }
+    handleMidi(midi) {
+        if (this.controller.isInterfaceEnabled()) {
+            if (midi.type === NOTE_ON && midi.data1 === 33) {
+                this.controller.toggleInterface();
+                return true;
+            }
+            return false;
+        }
+        if (midi.type === NOTE_ON && midi.data1 === 30) {
+            this.controller.toggleInterface();
+            return true;
+        }
+        this.controller.midiToDaw(midi);
+        return true;
+    }
+}
 class LiveLoopingController {
     constructor(bitwig, pressHandler, linnstrument, modules) {
+        _LiveLoopingController_interfaceEnabled.set(this, void 0);
+        _LiveLoopingController_noteInput.set(this, void 0);
+        _LiveLoopingController_linn.set(this, void 0);
         _LiveLoopingController_modules.set(this, void 0);
         this.bitwig = bitwig;
         this.pressHandler = pressHandler;
-        this.linn = linnstrument;
-        __classPrivateFieldSet(this, _LiveLoopingController_modules, modules, "f");
-        // Turn off all lights
-        rowIndexes.forEach((rowIndex) => {
-            columnIndexes.forEach((columnIndex) => {
-                this.linn.setLight({ row: rowIndex, column: columnIndex, color: "off" });
-            });
-        });
+        __classPrivateFieldSet(this, _LiveLoopingController_linn, linnstrument, "f");
+        __classPrivateFieldSet(this, _LiveLoopingController_modules, modules.map(module => new module(bitwig, pressHandler, linnstrument, this)), "f");
+        __classPrivateFieldSet(this, _LiveLoopingController_interfaceEnabled, true, "f");
+        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").turnOffLights();
         this.bitwig.host.getMidiInPort(0).setMidiCallback((...args) => this.handleMidi(...args));
         // Channel 0: Used to control bitwig
         // Channels 1-15: Used for MPE
-        this.bitwig.host.getMidiInPort(0)
-            .createNoteInput("LinnStrument", "?1????", "?2????", "?3????", "?4????", "?5????", "?6????", "?7????", "?8????", "?9????", "?A????", "?B????", "?C????", "?D????", "?E????", "?F????")
-            .setUseExpressiveMidi(true, 0, 48);
+        __classPrivateFieldSet(this, _LiveLoopingController_noteInput, this.bitwig.host.getMidiInPort(0)
+            .createNoteInput("LinnStrument", "?1????", "?2????", "?3????", "?4????", "?5????", "?6????", "?7????", "?8????", "?9????", "?A????", "?B????", "?C????", "?D????", "?E????", "?F????"), "f");
+        __classPrivateFieldGet(this, _LiveLoopingController_noteInput, "f").setUseExpressiveMidi(true, 0, 48);
         __classPrivateFieldGet(this, _LiveLoopingController_modules, "f").forEach(module => module.init());
+    }
+    midiToDaw(midi) {
+        __classPrivateFieldGet(this, _LiveLoopingController_noteInput, "f").sendRawMidiEvent(midi.type << 4, midi.data1, midi.data2);
     }
     handleMidi(status, data1, data2) {
         const type = status >> 4;
@@ -397,8 +464,29 @@ class LiveLoopingController {
         // Pass the midi message to each module.handleMidi until one returns true
         __classPrivateFieldGet(this, _LiveLoopingController_modules, "f").some(module => module.handleMidi({ type, channel, data1, data2 }));
     }
+    toggleInterface() {
+        __classPrivateFieldSet(this, _LiveLoopingController_interfaceEnabled, !__classPrivateFieldGet(this, _LiveLoopingController_interfaceEnabled, "f"), "f");
+        this.forceUpdate();
+    }
+    isInterfaceEnabled() {
+        return __classPrivateFieldGet(this, _LiveLoopingController_interfaceEnabled, "f");
+    }
+    forceUpdate() {
+        if (__classPrivateFieldGet(this, _LiveLoopingController_interfaceEnabled, "f")) {
+            __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").turnOffLights();
+        }
+        else {
+            __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").resetLights();
+        }
+        __classPrivateFieldGet(this, _LiveLoopingController_modules, "f").forEach(module => module.update());
+    }
+    setLight(options, force = false) {
+        if (__classPrivateFieldGet(this, _LiveLoopingController_interfaceEnabled, "f") || force) {
+            __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight(options);
+        }
+    }
 }
-_LiveLoopingController_modules = new WeakMap();
+_LiveLoopingController_interfaceEnabled = new WeakMap(), _LiveLoopingController_noteInput = new WeakMap(), _LiveLoopingController_linn = new WeakMap(), _LiveLoopingController_modules = new WeakMap();
 //  _______  _______  ______    ___   _______  _______
 // |       ||       ||    _ |  |   | |       ||       |
 // |  _____||       ||   | ||  |   | |    _  ||_     _|
@@ -417,11 +505,12 @@ function init() {
     const bitwig = new Bitwig(host);
     const linn = new LinnStrument(bitwig);
     const modules = [
-        new TracksRow(bitwig, pressHandler, linn),
-        new ClipArray(bitwig, pressHandler, linn),
-        new LoopLength(bitwig, pressHandler, linn),
-        new OverdubToggle(bitwig, pressHandler, linn),
-        new UndoRedo(bitwig, pressHandler, linn),
+        InterfaceToggle,
+        TracksRow,
+        ClipArray,
+        LoopLength,
+        OverdubToggle,
+        UndoRedo,
     ];
     new LiveLoopingController(bitwig, pressHandler, linn, modules);
     println("LinnstrumentLooping initialized!");
