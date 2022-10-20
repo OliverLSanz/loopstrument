@@ -12,7 +12,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ControllerModule_onUpdate, _ClipArray_instances, _ClipArray_updateClipLight, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _LiveLoopingController_interfaceEnabled, _LiveLoopingController_noteInput, _LiveLoopingController_linn, _LiveLoopingController_modules;
+var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ControllerModule_onUpdate, _ClipArray_instances, _ClipArray_updateClipLight, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _Metronome_instances, _Metronome_onTap, _Metronome_onLongPress, _LiveLoopingController_interfaceEnabled, _LiveLoopingController_noteInput, _LiveLoopingController_linn, _LiveLoopingController_modules;
 const lightColorValues = {
     default: 0,
     red: 1,
@@ -435,6 +435,34 @@ class InterfaceToggle extends ControllerModule {
         return true;
     }
 }
+class Metronome extends ControllerModule {
+    constructor() {
+        super(...arguments);
+        _Metronome_instances.add(this);
+    }
+    init() {
+        this.addValueObserver(this.bitwig.transport.isMetronomeEnabled(), () => {
+            const metronomeEnabled = this.bitwig.transport.isMetronomeEnabled().get();
+            this.controller.setLight({ row: 7, column: 4, color: metronomeEnabled ? "orange" : "blue" });
+        });
+    }
+    handleMidi(midi) {
+        if (midi.type === NOTE_ON && midi.data1 === 34) {
+            this.pressHandler.handlePressBegin(() => __classPrivateFieldGet(this, _Metronome_instances, "m", _Metronome_onTap).call(this), () => __classPrivateFieldGet(this, _Metronome_instances, "m", _Metronome_onLongPress).call(this), 500, midi.data1);
+            return true;
+        }
+        if (midi.type === NOTE_OFF && midi.data1 === 34) {
+            this.pressHandler.handlePressEnd(midi.data1);
+            return true;
+        }
+        return false;
+    }
+}
+_Metronome_instances = new WeakSet(), _Metronome_onTap = function _Metronome_onTap() {
+    this.bitwig.transport.tapTempo();
+}, _Metronome_onLongPress = function _Metronome_onLongPress() {
+    this.bitwig.transport.isMetronomeEnabled().toggle();
+};
 class LiveLoopingController {
     constructor(bitwig, pressHandler, linnstrument, modules) {
         _LiveLoopingController_interfaceEnabled.set(this, void 0);
@@ -511,6 +539,7 @@ function init() {
         LoopLength,
         OverdubToggle,
         UndoRedo,
+        Metronome,
     ];
     new LiveLoopingController(bitwig, pressHandler, linn, modules);
     println("LinnstrumentLooping initialized!");

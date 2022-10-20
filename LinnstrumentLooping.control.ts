@@ -532,6 +532,37 @@ class InterfaceToggle extends ControllerModule {
   }
 }
 
+class Metronome extends ControllerModule {
+  init(): void {
+    this.addValueObserver(this.bitwig.transport.isMetronomeEnabled(), () => {
+      const metronomeEnabled = this.bitwig.transport.isMetronomeEnabled().get()
+      this.controller.setLight({row: 7, column: 4, color: metronomeEnabled? "orange" : "blue"})
+    })
+  }
+
+  #onTap(){
+    this.bitwig.transport.tapTempo()
+  }
+
+  #onLongPress(){
+    this.bitwig.transport.isMetronomeEnabled().toggle()
+  }
+
+  handleMidi(midi: MidiMessage): boolean {
+    if (midi.type === NOTE_ON && midi.data1 === 34) {
+      this.pressHandler.handlePressBegin(() => this.#onTap(), () => this.#onLongPress(), 500, midi.data1)
+      return true
+    }
+
+    if(midi.type === NOTE_OFF && midi.data1 === 34){
+      this.pressHandler.handlePressEnd(midi.data1)
+      return true
+    }
+
+    return false
+  }
+}
+
 class LiveLoopingController {
   bitwig: Bitwig
   pressHandler: PressHandler
@@ -630,6 +661,7 @@ function init() {
     LoopLength,
     OverdubToggle,
     UndoRedo,
+    Metronome,
   ]
 
   new LiveLoopingController(bitwig, pressHandler, linn, modules)
