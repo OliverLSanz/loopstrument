@@ -94,6 +94,7 @@ class Bitwig {
 
   midiOut({ type, channel, data1, data2 }: MidiMessage) {
     const status = type << 4 + channel
+    println(`type ${type} channel ${channel} data1 ${data1} data2 ${data2}`)
     this.host.getMidiOutPort(0).sendMidi(status, data1, data2)
   }
 }
@@ -258,32 +259,34 @@ class ControllerModule {
 }
 
 class TracksRow extends ControllerModule {
+  #baseButton = 112
+
   init(): void {
     for (let trackIndex = 0; trackIndex < 5; trackIndex++) {
       const track = this.bitwig.tracks.getItemAt(trackIndex)
 
       this.addValueObserver(track.arm(), () => {
         const isArmed = track.arm().get()
-        this.controller.setLight({ row: 0 as row, column: trackIndex as column, color: isArmed ? "magenta" : "off" })
+        this.controller.setButtonLight(this.#baseButton+trackIndex, isArmed ? "magenta" : "off" )
       })
     }
   }
 
   handleMidi(midi: MidiMessage): boolean {
     // SWITCH TRACKS
-    if (midi.type === NOTE_ON && midi.data1 === 65) {
+    if (midi.type === NOTE_ON && midi.data1 === this.#baseButton) {
       this.bitwig.armTrack(0)
     }
-    if (midi.type === NOTE_ON && midi.data1 === 66) {
+    if (midi.type === NOTE_ON && midi.data1 === this.#baseButton+1) {
       this.bitwig.armTrack(1)
     }
-    if (midi.type === NOTE_ON && midi.data1 === 67) {
+    if (midi.type === NOTE_ON && midi.data1 === this.#baseButton+2) {
       this.bitwig.armTrack(2)
     }
-    if (midi.type === NOTE_ON && midi.data1 === 68) {
+    if (midi.type === NOTE_ON && midi.data1 === this.#baseButton+3) {
       this.bitwig.armTrack(3)
     }
-    if (midi.type === NOTE_ON && midi.data1 === 69) {
+    if (midi.type === NOTE_ON && midi.data1 === this.#baseButton+4) {
       this.bitwig.armTrack(4)
     }
 
@@ -417,8 +420,6 @@ class LoopLength extends ControllerModule {
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    println(String(midi.data1))
-
     const noteBase = 35
     const button = midi.data1 - noteBase
 
@@ -504,10 +505,8 @@ class InterfaceToggle extends ControllerModule {
   init(): void {
     this.addInitCallback(() => {
       if(this.controller.isInterfaceEnabled()){
-        println("EL DE ARRIBA")
         this.controller.setLight({row: 7, column: 3, color: 'yellow'})
       }else{
-        println("EL DE ABAJO")
         this.controller.setLight({row: 7, column: 0, color: 'yellow'}, true)
       }
     })
@@ -566,8 +565,9 @@ class Metronome extends ControllerModule {
 class LiveLoopingController {
   bitwig: Bitwig
   pressHandler: PressHandler
-  #interfaceEnabled: boolean
+  #keyTranslationTable: number[]
   #noteInput: API.NoteInput
+  #interfaceEnabled: boolean
   #linn: LinnStrument
   #modules: ControllerModule[]
 
@@ -577,24 +577,69 @@ class LiveLoopingController {
     this.#linn = linnstrument
     this.#modules = modules.map(module => new module(bitwig, pressHandler, linnstrument, this))
     this.#interfaceEnabled = true
+    this.#keyTranslationTable = []
 
-    this.#linn.turnOffLights()
+    for(let key = 0; key < 128; key++){
+      if(key%16 > 4){
+        this.#keyTranslationTable.push(this.#buttonToNote(key))
+      }else{
+        this.#keyTranslationTable.push(-1)
+      }
+    }
+
+    // this.#linn.turnOffLights()
 
     this.bitwig.host.getMidiInPort(0).setMidiCallback((...args) => this.handleMidi(...args));
 
-    // Channel 0: Used to control bitwig
-    // Channels 1-15: Used for MPE
-    this.#noteInput = this.bitwig.host.getMidiInPort(0)
-      .createNoteInput("LinnStrument", "?1????", "?2????", "?3????", "?4????",
-        "?5????", "?6????", "?7????", "?8????", "?9????", "?A????",
-        "?B????", "?C????", "?D????", "?E????", "?F????")
-    this.#noteInput.setUseExpressiveMidi(true, 0, 48);
+    this.bitwig.host.getMidiInPort(0)
+    this.#noteInput = this.bitwig.host.getMidiInPort(0).createNoteInput("LinnStrument", "??????")
+    this.#noteInput.setUseExpressiveMidi(true, 0, 24);
+    this.#noteInput.setKeyTranslationTable(this.#keyTranslationTable)
+
+    this.#setPlayAreaLights()
 
     this.#modules.forEach(module => module.init())
   }
 
+  #buttonToNote(buttonIndex: number): number{
+    const buttonOffset = 0  // number of the first button
+    const noteOffset = 30  // number of the first note
+    const buttonsPerRow = 16
+    const rowOffset = 5 // Distance in semitomes while going 1 row up
+    const rowDecrement = buttonsPerRow - rowOffset
+
+    const currentRow = Math.floor((buttonIndex - buttonOffset)/buttonsPerRow)
+    const rowAdjustment = currentRow*rowDecrement
+    const note = buttonIndex - buttonOffset - rowAdjustment + noteOffset
+
+    return note
+  }
+
+  #setPlayAreaLights(){
+    const module = 12
+    for(let button = 0; button < this.#keyTranslationTable.length; button++){
+      if(button%16 > 4 && this.#keyTranslationTable[button] % module === 0){
+        this.setButtonLight(button, "orange")
+      }
+    }
+  }
+
+  setButtonLight(button: number, color: lightColor){
+    const buttonOffset = 0  // number of the first button
+    const buttonsPerRow = 16
+    const row = Math.floor((button - buttonOffset)/buttonsPerRow)
+    const column = button - row*buttonsPerRow
+    this.setLight({row: 7 - row as row, column: column as column, color})
+  }
+
+  forwardButton(buttonIndex: number, forward: boolean){
+    this.#keyTranslationTable[buttonIndex] = forward ? buttonIndex : -1
+    this.#noteInput.setKeyTranslationTable(this.#keyTranslationTable)
+  }
+
   midiToDaw(midi: MidiMessage){
-    this.#noteInput.sendRawMidiEvent(midi.type << 4, midi.data1, midi.data2)
+    println(">>>>"+JSON.stringify(midi))
+    // this.#noteInput.sendRawMidiEvent(midi.type << 4, midi.data1, midi.data2)
   }
 
   handleMidi(status: number, data1: number, data2: number){
@@ -655,13 +700,7 @@ function init() {
   const linn = new LinnStrument(bitwig)
 
   const modules = [
-    InterfaceToggle,
-    TracksRow,
-    ClipArray,
-    LoopLength,
-    OverdubToggle,
-    UndoRedo,
-    Metronome,
+    TracksRow
   ]
 
   new LiveLoopingController(bitwig, pressHandler, linn, modules)
