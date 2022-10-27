@@ -94,7 +94,6 @@ class Bitwig {
 
   midiOut({ type, channel, data1, data2 }: MidiMessage) {
     const status = type << 4 + channel
-    println(`type ${type} channel ${channel} data1 ${data1} data2 ${data2}`)
     this.host.getMidiOutPort(0).sendMidi(status, data1, data2)
   }
 }
@@ -320,32 +319,34 @@ class ClipArray extends ControllerModule {
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    if (midi.type === NOTE_ON && midi.data1 >= 50 && midi.data1 <= 64) {
-      const trackIndex = midi.data1 % 5
-      const track = this.bitwig.tracks.getItemAt(trackIndex)
-      const clipIndex = Math.floor(Math.abs(midi.data1 - 64) / 5)
-      const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
+    const buttonRow = Math.floor(midi.data1 / 16)
 
-      function onTap() {
-        if (clip.isPlaying().getAsBoolean()) {
-          track.stop()
-        } else {
-          clip.launch()
+    if(buttonRow > 3 && buttonRow < 7 && midi.data1 % 16 < 5){
+      if (midi.type === NOTE_ON) {
+        const trackIndex = midi.data1 % 16
+        const clipIndex = 6 - buttonRow
+
+        const track = this.bitwig.tracks.getItemAt(trackIndex)
+        const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
+
+        function onTap() {
+          if (clip.isPlaying().getAsBoolean()) {
+            track.stop()
+          } else {
+            clip.launch()
+          }
         }
+
+        function onLongPress() {
+          clip.deleteObject()
+        }
+
+        this.pressHandler.handlePressBegin(onTap, onLongPress, 1000, midi.data1)
       }
 
-      function onLongPress() {
-        clip.deleteObject()
+      if (midi.type === NOTE_OFF) {
+        this.pressHandler.handlePressEnd(midi.data1)
       }
-
-      this.pressHandler.handlePressBegin(onTap, onLongPress, 1000, midi.data1)
-
-      return true
-    }
-
-    if (midi.type === NOTE_OFF && midi.data1 >= 50 && midi.data1 <= 64) {
-      this.pressHandler.handlePressEnd(midi.data1)
-
       return true
     }
 
@@ -420,7 +421,7 @@ class LoopLength extends ControllerModule {
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    const noteBase = 35
+    const noteBase = 16
     const button = midi.data1 - noteBase
 
     if(button < 0 || button > 4){
@@ -469,12 +470,12 @@ class UndoRedo extends ControllerModule {
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    if (midi.type === NOTE_ON && midi.data1 === 31) {
+    if (midi.type === NOTE_ON && midi.data1 === 1) {
       this.bitwig.application.undo()
       return true
     }
 
-    if (midi.type === NOTE_ON && midi.data1 === 32) {
+    if (midi.type === NOTE_ON && midi.data1 === 2) {
       this.bitwig.application.redo()
       return true
     }
@@ -492,10 +493,12 @@ class OverdubToggle extends ControllerModule {
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    if (midi.type === NOTE_ON && midi.data1 === 30) {
-      const overdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().getAsBoolean()
-      this.bitwig.transport.isClipLauncherOverdubEnabled().set(!overdubEnabled)
-      return true
+    if(this.controller.isInterfaceEnabled()){
+      if (midi.type === NOTE_ON && midi.data1 === 0) {
+        const overdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().getAsBoolean()
+        this.bitwig.transport.isClipLauncherOverdubEnabled().set(!overdubEnabled)
+        return true
+      }
     }
     return false
   }
@@ -514,20 +517,19 @@ class InterfaceToggle extends ControllerModule {
 
   handleMidi(midi: MidiMessage): boolean {
     if(this.controller.isInterfaceEnabled()){
-      if (midi.type === NOTE_ON && midi.data1 === 33) {
+      if (midi.type === NOTE_ON && midi.data1 === 3) {
         this.controller.toggleInterface()
         return true
       }
       return false
     }
-
-    if(midi.type === NOTE_ON && midi.data1 === 30){
+    println(String(midi.data1))
+    if(midi.type === NOTE_ON && midi.data1 === 0){
       this.controller.toggleInterface()
       return true
     }
 
-    this.controller.midiToDaw(midi)
-    return true
+    return false
   }
 }
 
@@ -548,12 +550,12 @@ class Metronome extends ControllerModule {
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    if (midi.type === NOTE_ON && midi.data1 === 34) {
+    if (midi.type === NOTE_ON && midi.data1 === 4) {
       this.pressHandler.handlePressBegin(() => this.#onTap(), () => this.#onLongPress(), 500, midi.data1)
       return true
     }
 
-    if(midi.type === NOTE_OFF && midi.data1 === 34){
+    if(midi.type === NOTE_OFF && midi.data1 === 4){
       this.pressHandler.handlePressEnd(midi.data1)
       return true
     }
@@ -617,29 +619,33 @@ class LiveLoopingController {
 
   #setPlayAreaLights(){
     const module = 12
-    for(let button = 0; button < this.#keyTranslationTable.length; button++){
-      if(button%16 > 4 && this.#keyTranslationTable[button] % module === 0){
-        this.setButtonLight(button, "orange")
+    println(String(this.#interfaceEnabled))
+    if(this.isInterfaceEnabled()){
+      for(let button = 0; button < this.#keyTranslationTable.length; button++){
+        if(button%16 > 4 && this.#keyTranslationTable[button] % module === 0){
+          this.setButtonLight(button, "orange", true)
+        }
+      }
+    }else{
+      for(let button = 0; button < this.#keyTranslationTable.length; button++){
+        if(this.#keyTranslationTable[button] % module === 0){
+          this.setButtonLight(button, "orange", true)
+        }
       }
     }
   }
 
-  setButtonLight(button: number, color: lightColor){
+  setButtonLight(button: number, color: lightColor, force?: boolean){
     const buttonOffset = 0  // number of the first button
     const buttonsPerRow = 16
     const row = Math.floor((button - buttonOffset)/buttonsPerRow)
     const column = button - row*buttonsPerRow
-    this.setLight({row: 7 - row as row, column: column as column, color})
+    this.setLight({row: 7 - row as row, column: column as column, color}, force)
   }
 
   forwardButton(buttonIndex: number, forward: boolean){
     this.#keyTranslationTable[buttonIndex] = forward ? buttonIndex : -1
     this.#noteInput.setKeyTranslationTable(this.#keyTranslationTable)
-  }
-
-  midiToDaw(midi: MidiMessage){
-    println(">>>>"+JSON.stringify(midi))
-    // this.#noteInput.sendRawMidiEvent(midi.type << 4, midi.data1, midi.data2)
   }
 
   handleMidi(status: number, data1: number, data2: number){
@@ -651,6 +657,26 @@ class LiveLoopingController {
   }
 
   toggleInterface(){
+    const newTranslationTable = []
+    if(this.#interfaceEnabled){
+      for(let key = 0; key < 128; key++){
+        if(key != 0){
+          newTranslationTable.push(this.#buttonToNote(key))
+        }else{
+          newTranslationTable.push(-1)
+        }
+      }
+    }else{
+      for(let key = 0; key < 128; key++){
+        if(key%16 > 4){
+          newTranslationTable.push(this.#buttonToNote(key))
+        }else{
+          newTranslationTable.push(-1)
+        }
+      }
+    }
+    this.#keyTranslationTable = newTranslationTable
+    this.#noteInput.setKeyTranslationTable(this.#keyTranslationTable)
     this.#interfaceEnabled = !this.#interfaceEnabled
     this.forceUpdate()
   }
@@ -667,6 +693,7 @@ class LiveLoopingController {
     }
 
     this.#modules.forEach(module => module.update())
+    this.#setPlayAreaLights()
   }
 
   setLight(options: {row: row, column: column, color: lightColor}, force: boolean = false){
@@ -700,7 +727,13 @@ function init() {
   const linn = new LinnStrument(bitwig)
 
   const modules = [
-    TracksRow
+    TracksRow,
+    ClipArray,
+    LoopLength,
+    UndoRedo,
+    OverdubToggle,
+    InterfaceToggle,
+    Metronome,
   ]
 
   new LiveLoopingController(bitwig, pressHandler, linn, modules)
