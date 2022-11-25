@@ -460,23 +460,22 @@ class LoopLength extends ControllerModule {
 }
 
 class UndoRedo extends ControllerModule {
+  #buttonIndex = 3
+
   init(): void {
     this.addInitCallback(() => {
-      // set undo button light
-      this.controller.setLight({ row: 7, column: 1, color: "magenta" })
-      // set redo button light
-      this.controller.setLight({ row: 7, column: 2, color: "blue" })
+      this.controller.setButtonLight(this.#buttonIndex, "magenta")
     })
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    if (midi.type === NOTE_ON && midi.data1 === 1) {
-      this.bitwig.application.undo()
+    if (midi.type === NOTE_ON && midi.data1 === this.#buttonIndex) {
+      this.pressHandler.handlePressBegin(() => this.bitwig.application.undo(), () => this.bitwig.application.redo(), 500, midi.data1)
       return true
     }
 
-    if (midi.type === NOTE_ON && midi.data1 === 2) {
-      this.bitwig.application.redo()
+    if(midi.type === NOTE_OFF && midi.data1 === this.#buttonIndex){
+      this.pressHandler.handlePressEnd(midi.data1)
       return true
     }
 
@@ -505,26 +504,29 @@ class OverdubToggle extends ControllerModule {
 }
 
 class InterfaceToggle extends ControllerModule {
+  #buttonWhileEnabled = 4
+  #buttonWhileDisabled = 0
+
   init(): void {
     this.addInitCallback(() => {
       if(this.controller.isInterfaceEnabled()){
-        this.controller.setLight({row: 7, column: 3, color: 'yellow'})
+        this.controller.setButtonLight(this.#buttonWhileEnabled, 'yellow')
       }else{
-        this.controller.setLight({row: 7, column: 0, color: 'yellow'}, true)
+        this.controller.setButtonLight(this.#buttonWhileDisabled, 'yellow', true)
       }
     })
   }
 
   handleMidi(midi: MidiMessage): boolean {
     if(this.controller.isInterfaceEnabled()){
-      if (midi.type === NOTE_ON && midi.data1 === 3) {
+      if (midi.type === NOTE_ON && midi.data1 === this.#buttonWhileEnabled) {
         this.controller.toggleInterface()
         return true
       }
       return false
     }
     println(String(midi.data1))
-    if(midi.type === NOTE_ON && midi.data1 === 0){
+    if(midi.type === NOTE_ON && midi.data1 === this.#buttonWhileDisabled){
       this.controller.toggleInterface()
       return true
     }
@@ -534,10 +536,12 @@ class InterfaceToggle extends ControllerModule {
 }
 
 class Metronome extends ControllerModule {
+  #button = 1
+
   init(): void {
     this.addValueObserver(this.bitwig.transport.isMetronomeEnabled(), () => {
       const metronomeEnabled = this.bitwig.transport.isMetronomeEnabled().get()
-      this.controller.setLight({row: 7, column: 4, color: metronomeEnabled? "orange" : "blue"})
+      this.controller.setButtonLight(this.#button, metronomeEnabled? "orange" : "white")
     })
   }
 
@@ -550,12 +554,12 @@ class Metronome extends ControllerModule {
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    if (midi.type === NOTE_ON && midi.data1 === 4) {
+    if (midi.type === NOTE_ON && midi.data1 === this.#button) {
       this.pressHandler.handlePressBegin(() => this.#onTap(), () => this.#onLongPress(), 500, midi.data1)
       return true
     }
 
-    if(midi.type === NOTE_OFF && midi.data1 === 4){
+    if(midi.type === NOTE_OFF && midi.data1 === this.#button){
       this.pressHandler.handlePressEnd(midi.data1)
       return true
     }

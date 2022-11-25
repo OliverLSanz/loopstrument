@@ -12,7 +12,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ControllerModule_onUpdate, _TracksRow_baseButton, _ClipArray_instances, _ClipArray_updateClipLight, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _Metronome_instances, _Metronome_onTap, _Metronome_onLongPress, _LiveLoopingController_instances, _LiveLoopingController_keyTranslationTable, _LiveLoopingController_noteInput, _LiveLoopingController_interfaceEnabled, _LiveLoopingController_linn, _LiveLoopingController_modules, _LiveLoopingController_buttonToNote, _LiveLoopingController_setPlayAreaLights;
+var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ControllerModule_onUpdate, _TracksRow_baseButton, _ClipArray_instances, _ClipArray_updateClipLight, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _UndoRedo_buttonIndex, _InterfaceToggle_buttonWhileEnabled, _InterfaceToggle_buttonWhileDisabled, _Metronome_instances, _Metronome_button, _Metronome_onTap, _Metronome_onLongPress, _LiveLoopingController_instances, _LiveLoopingController_keyTranslationTable, _LiveLoopingController_noteInput, _LiveLoopingController_interfaceEnabled, _LiveLoopingController_linn, _LiveLoopingController_modules, _LiveLoopingController_buttonToNote, _LiveLoopingController_setPlayAreaLights;
 const lightColorValues = {
     default: 0,
     red: 1,
@@ -376,26 +376,28 @@ class LoopLength extends ControllerModule {
 }
 _LoopLength_bars = new WeakMap(), _LoopLength_nextBars = new WeakMap(), _LoopLength_pressedButtons = new WeakMap();
 class UndoRedo extends ControllerModule {
+    constructor() {
+        super(...arguments);
+        _UndoRedo_buttonIndex.set(this, 3);
+    }
     init() {
         this.addInitCallback(() => {
-            // set undo button light
-            this.controller.setLight({ row: 7, column: 1, color: "magenta" });
-            // set redo button light
-            this.controller.setLight({ row: 7, column: 2, color: "blue" });
+            this.controller.setButtonLight(__classPrivateFieldGet(this, _UndoRedo_buttonIndex, "f"), "magenta");
         });
     }
     handleMidi(midi) {
-        if (midi.type === NOTE_ON && midi.data1 === 1) {
-            this.bitwig.application.undo();
+        if (midi.type === NOTE_ON && midi.data1 === __classPrivateFieldGet(this, _UndoRedo_buttonIndex, "f")) {
+            this.pressHandler.handlePressBegin(() => this.bitwig.application.undo(), () => this.bitwig.application.redo(), 500, midi.data1);
             return true;
         }
-        if (midi.type === NOTE_ON && midi.data1 === 2) {
-            this.bitwig.application.redo();
+        if (midi.type === NOTE_OFF && midi.data1 === __classPrivateFieldGet(this, _UndoRedo_buttonIndex, "f")) {
+            this.pressHandler.handlePressEnd(midi.data1);
             return true;
         }
         return false;
     }
 }
+_UndoRedo_buttonIndex = new WeakMap();
 class OverdubToggle extends ControllerModule {
     init() {
         this.addValueObserver(this.bitwig.transport.isClipLauncherOverdubEnabled(), () => {
@@ -415,56 +417,63 @@ class OverdubToggle extends ControllerModule {
     }
 }
 class InterfaceToggle extends ControllerModule {
+    constructor() {
+        super(...arguments);
+        _InterfaceToggle_buttonWhileEnabled.set(this, 4);
+        _InterfaceToggle_buttonWhileDisabled.set(this, 0);
+    }
     init() {
         this.addInitCallback(() => {
             if (this.controller.isInterfaceEnabled()) {
-                this.controller.setLight({ row: 7, column: 3, color: 'yellow' });
+                this.controller.setButtonLight(__classPrivateFieldGet(this, _InterfaceToggle_buttonWhileEnabled, "f"), 'yellow');
             }
             else {
-                this.controller.setLight({ row: 7, column: 0, color: 'yellow' }, true);
+                this.controller.setButtonLight(__classPrivateFieldGet(this, _InterfaceToggle_buttonWhileDisabled, "f"), 'yellow', true);
             }
         });
     }
     handleMidi(midi) {
         if (this.controller.isInterfaceEnabled()) {
-            if (midi.type === NOTE_ON && midi.data1 === 3) {
+            if (midi.type === NOTE_ON && midi.data1 === __classPrivateFieldGet(this, _InterfaceToggle_buttonWhileEnabled, "f")) {
                 this.controller.toggleInterface();
                 return true;
             }
             return false;
         }
         println(String(midi.data1));
-        if (midi.type === NOTE_ON && midi.data1 === 0) {
+        if (midi.type === NOTE_ON && midi.data1 === __classPrivateFieldGet(this, _InterfaceToggle_buttonWhileDisabled, "f")) {
             this.controller.toggleInterface();
             return true;
         }
         return false;
     }
 }
+_InterfaceToggle_buttonWhileEnabled = new WeakMap(), _InterfaceToggle_buttonWhileDisabled = new WeakMap();
 class Metronome extends ControllerModule {
     constructor() {
         super(...arguments);
         _Metronome_instances.add(this);
+        _Metronome_button.set(this, 1);
     }
     init() {
         this.addValueObserver(this.bitwig.transport.isMetronomeEnabled(), () => {
             const metronomeEnabled = this.bitwig.transport.isMetronomeEnabled().get();
-            this.controller.setLight({ row: 7, column: 4, color: metronomeEnabled ? "orange" : "blue" });
+            this.controller.setButtonLight(__classPrivateFieldGet(this, _Metronome_button, "f"), metronomeEnabled ? "orange" : "white");
         });
     }
     handleMidi(midi) {
-        if (midi.type === NOTE_ON && midi.data1 === 4) {
+        if (midi.type === NOTE_ON && midi.data1 === __classPrivateFieldGet(this, _Metronome_button, "f")) {
             this.pressHandler.handlePressBegin(() => __classPrivateFieldGet(this, _Metronome_instances, "m", _Metronome_onTap).call(this), () => __classPrivateFieldGet(this, _Metronome_instances, "m", _Metronome_onLongPress).call(this), 500, midi.data1);
             return true;
         }
-        if (midi.type === NOTE_OFF && midi.data1 === 4) {
+        if (midi.type === NOTE_OFF && midi.data1 === __classPrivateFieldGet(this, _Metronome_button, "f")) {
             this.pressHandler.handlePressEnd(midi.data1);
             return true;
         }
         return false;
     }
 }
-_Metronome_instances = new WeakSet(), _Metronome_onTap = function _Metronome_onTap() {
+_Metronome_button = new WeakMap(), _Metronome_instances = new WeakSet(), _Metronome_onTap = function _Metronome_onTap() {
     this.bitwig.transport.tapTempo();
 }, _Metronome_onLongPress = function _Metronome_onLongPress() {
     this.bitwig.transport.isMetronomeEnabled().toggle();
