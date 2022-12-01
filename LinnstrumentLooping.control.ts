@@ -41,6 +41,8 @@ const NOTE_OFF = 8
 const NOTE_ON = 9
 const CC = 11
 
+const MAX_MIDI_NOTE = 127
+
 
 //  ___      ___   _______  ______    _______  ______    __   __
 // |   |    |   | |  _    ||    _ |  |   _   ||    _ |  |  | |  |
@@ -258,35 +260,35 @@ class ControllerModule {
 }
 
 class TracksRow extends ControllerModule {
-  #baseButton = 112
+  #row = 0
+  #column = 0
+  #numberOfTracks = 5
+  #baseButton: number
+
+  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument, controller: LiveLoopingController) {
+    super(bitwig, pressHandler, linnstrument, controller)
+    this.#baseButton = this.controller.coordinateToControlSplitButton({row: this.#row, column: this.#column})
+  }
 
   init(): void {
-    for (let trackIndex = 0; trackIndex < 5; trackIndex++) {
+    for (let trackIndex = 0; trackIndex < this.#numberOfTracks; trackIndex++) {
       const track = this.bitwig.tracks.getItemAt(trackIndex)
 
       this.addValueObserver(track.arm(), () => {
         const isArmed = track.arm().get()
-        this.controller.setButtonLight(this.#baseButton+trackIndex, isArmed ? "magenta" : "off" )
+        this.controller.setLight({row: this.#row as row, column: this.#column + trackIndex as column, color: isArmed ? "magenta" : "off"})
       })
     }
   }
 
   handleMidi(midi: MidiMessage): boolean {
     // SWITCH TRACKS
-    if (midi.type === NOTE_ON && midi.data1 === this.#baseButton) {
-      this.bitwig.armTrack(0)
-    }
-    if (midi.type === NOTE_ON && midi.data1 === this.#baseButton+1) {
-      this.bitwig.armTrack(1)
-    }
-    if (midi.type === NOTE_ON && midi.data1 === this.#baseButton+2) {
-      this.bitwig.armTrack(2)
-    }
-    if (midi.type === NOTE_ON && midi.data1 === this.#baseButton+3) {
-      this.bitwig.armTrack(3)
-    }
-    if (midi.type === NOTE_ON && midi.data1 === this.#baseButton+4) {
-      this.bitwig.armTrack(4)
+
+    for (let trackIndex = 0; trackIndex < this.#numberOfTracks; trackIndex++) {
+      if (midi.type === NOTE_ON && midi.data1 === this.#baseButton+trackIndex) {
+        this.bitwig.armTrack(trackIndex)
+        return true
+      }
     }
 
     return false
@@ -294,12 +296,23 @@ class TracksRow extends ControllerModule {
 }
 
 class ClipArray extends ControllerModule {
+  #row = 1
+  #column = 0
+  #numberOfTracks = 5
+  #clipsPerTrack = 3
+  #baseButton: number
+
+  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument, controller: LiveLoopingController) {
+    super(bitwig, pressHandler, linnstrument, controller)
+    this.#baseButton = this.controller.coordinateToControlSplitButton({row: this.#row, column: this.#column})
+  }
+
   init(): void{
     // Start observers
-    for (let trackIndex = 0; trackIndex < 5; trackIndex++) {
+    for (let trackIndex = 0; trackIndex < this.#numberOfTracks; trackIndex++) {
       const track = this.bitwig.tracks.getItemAt(trackIndex)
 
-      for (let clipIndex = 0; clipIndex < 3; clipIndex++) {
+      for (let clipIndex = 0; clipIndex < this.#clipsPerTrack; clipIndex++) {
         const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
 
         this.addValueObserver(clip.isPlaying(), () => {
@@ -319,12 +332,13 @@ class ClipArray extends ControllerModule {
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    const buttonRow = Math.floor(midi.data1 / 16)
+    const { row, column } = this.controller.controlSplitButtonToCoordinate(midi.data1)
 
-    if(buttonRow > 3 && buttonRow < 7 && midi.data1 % 16 < 5){
+    if( row >= this.#row && row < this.#row + this.#clipsPerTrack 
+        && column >= this.#column && column < this.#column + this.#numberOfTracks ){
       if (midi.type === NOTE_ON) {
-        const trackIndex = midi.data1 % 16
-        const clipIndex = 6 - buttonRow
+        const trackIndex = column - this.#column
+        const clipIndex = row - this.#row
 
         const track = this.bitwig.tracks.getItemAt(trackIndex)
         const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
@@ -374,6 +388,8 @@ class ClipArray extends ControllerModule {
 }
 
 class LoopLength extends ControllerModule {
+  #row = 6
+  #column = 0
   #bars: number = 0
   #nextBars: number = 0
   #pressedButtons: [boolean, boolean, boolean, boolean, boolean] = [false, false, false, false, false]
@@ -413,16 +429,17 @@ class LoopLength extends ControllerModule {
     const light4 = (numberOfBars>>3) % 2
     const light5 = (numberOfBars>>4) % 2
 
-    this.controller.setLight({row: 6, column: 0, color: light1 ? "blue" : "off"})
-    this.controller.setLight({row: 6, column: 1, color: light2 ? "blue" : "off"})
-    this.controller.setLight({row: 6, column: 2, color: light3 ? "blue" : "off"})
-    this.controller.setLight({row: 6, column: 3, color: light4 ? "blue" : "off"})
-    this.controller.setLight({row: 6, column: 4, color: light5 ? "blue" : "off"})
+    this.controller.setLight({row: this.#row as row, column: this.#column as column, color: light1 ? "blue" : "off"})
+    this.controller.setLight({row: this.#row as row, column: this.#column + 1 as column, color: light2 ? "blue" : "off"})
+    this.controller.setLight({row: this.#row as row, column: this.#column + 2 as column, color: light3 ? "blue" : "off"})
+    this.controller.setLight({row: this.#row as row, column: this.#column + 3 as column, color: light4 ? "blue" : "off"})
+    this.controller.setLight({row: this.#row as row, column: this.#column + 4 as column, color: light5 ? "blue" : "off"})
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    const noteBase = 16
-    const button = midi.data1 - noteBase
+    const baseNote = this.controller.coordinateToControlSplitButton({row: this.#row, column: this.#column})
+    const receivedNote = midi.data1
+    const button = receivedNote - baseNote
 
     if(button < 0 || button > 4){
       return false
@@ -460,21 +477,24 @@ class LoopLength extends ControllerModule {
 }
 
 class UndoRedo extends ControllerModule {
-  #buttonIndex = 3
+  #row = 7
+  #column = 3
 
   init(): void {
     this.addInitCallback(() => {
-      this.controller.setButtonLight(this.#buttonIndex, "magenta")
+      this.controller.setLight({row: this.#row as row, column: this.#column as column, color: "magenta"})
     })
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    if (midi.type === NOTE_ON && midi.data1 === this.#buttonIndex) {
+    const buttonNote = this.controller.coordinateToControlSplitButton({row: this.#row, column: this.#column})
+
+    if (midi.type === NOTE_ON && midi.data1 === buttonNote) {
       this.pressHandler.handlePressBegin(() => this.bitwig.application.undo(), () => this.bitwig.application.redo(), 500, midi.data1)
       return true
     }
 
-    if(midi.type === NOTE_OFF && midi.data1 === this.#buttonIndex){
+    if(midi.type === NOTE_OFF && midi.data1 === buttonNote){
       this.pressHandler.handlePressEnd(midi.data1)
       return true
     }
@@ -484,16 +504,21 @@ class UndoRedo extends ControllerModule {
 }
 
 class OverdubToggle extends ControllerModule {
+  #row = 7
+  #column = 0
+
   init(): void {
     this.addValueObserver(this.bitwig.transport.isClipLauncherOverdubEnabled(), () => {
       const isOverdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().get()
-      this.controller.setLight({ row: 7, column: 0, color: isOverdubEnabled ? "red" : "white" })
+      this.controller.setLight({ row: this.#row as row, column: this.#column as column, color: isOverdubEnabled ? "red" : "white" })
     })
   }
 
   handleMidi(midi: MidiMessage): boolean {
+    const buttonNote = this.controller.coordinateToControlSplitButton({row: this.#row, column: this.#column})
+
     if(this.controller.isInterfaceEnabled()){
-      if (midi.type === NOTE_ON && midi.data1 === 0) {
+      if (midi.type === NOTE_ON && midi.data1 === buttonNote) {
         const overdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().getAsBoolean()
         this.bitwig.transport.isClipLauncherOverdubEnabled().set(!overdubEnabled)
         return true
@@ -504,15 +529,26 @@ class OverdubToggle extends ControllerModule {
 }
 
 class InterfaceToggle extends ControllerModule {
-  #buttonWhileEnabled = 4
-  #buttonWhileDisabled = 0
+  #rowWhileEnabled = 7
+  #columnWhileEnabled = 4
+  #rowWhileDisabled = 7
+  #columnWhileDisabled = 0
 
+  #buttonWhileEnabled: number
+  #buttonWhileDisabled: number
+
+  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument, controller: LiveLoopingController) {
+    super(bitwig, pressHandler, linnstrument, controller)
+    this.#buttonWhileEnabled = this.controller.coordinateToControlSplitButton({row: this.#rowWhileEnabled, column: this.#columnWhileEnabled})
+    this.#buttonWhileDisabled = this.controller.coordinateToControlSplitButton({row: this.#rowWhileDisabled, column: this.#columnWhileDisabled})
+  }
+  
   init(): void {
     this.addInitCallback(() => {
       if(this.controller.isInterfaceEnabled()){
-        this.controller.setButtonLight(this.#buttonWhileEnabled, 'yellow')
+        this.controller.setLight({row: this.#rowWhileEnabled as row, column: this.#columnWhileEnabled as column, color: 'yellow'})
       }else{
-        this.controller.setButtonLight(this.#buttonWhileDisabled, 'yellow', true)
+        this.controller.setLight({row: this.#rowWhileDisabled as row, column: this.#columnWhileDisabled as column, color: 'yellow'}, true)
       }
     })
   }
@@ -527,7 +563,7 @@ class InterfaceToggle extends ControllerModule {
     }
     println(String(midi.data1))
     if(midi.type === NOTE_ON && midi.data1 === this.#buttonWhileDisabled){
-      this.controller.toggleInterface()
+        this.controller.toggleInterface()
       return true
     }
 
@@ -536,12 +572,13 @@ class InterfaceToggle extends ControllerModule {
 }
 
 class Metronome extends ControllerModule {
-  #button = 1
+  #row = 7
+  #column = 1
 
   init(): void {
     this.addValueObserver(this.bitwig.transport.isMetronomeEnabled(), () => {
       const metronomeEnabled = this.bitwig.transport.isMetronomeEnabled().get()
-      this.controller.setButtonLight(this.#button, metronomeEnabled? "orange" : "white")
+      this.controller.setLight({row: this.#row as row, column: this.#column as column, color: metronomeEnabled? "orange" : "white"})
     })
   }
 
@@ -554,12 +591,14 @@ class Metronome extends ControllerModule {
   }
 
   handleMidi(midi: MidiMessage): boolean {
-    if (midi.type === NOTE_ON && midi.data1 === this.#button) {
+    const button = this.controller.coordinateToControlSplitButton({row: this.#row, column: this.#column})
+
+    if (midi.type === NOTE_ON && midi.data1 === button) {
       this.pressHandler.handlePressBegin(() => this.#onTap(), () => this.#onLongPress(), 500, midi.data1)
       return true
     }
 
-    if(midi.type === NOTE_OFF && midi.data1 === this.#button){
+    if(midi.type === NOTE_OFF && midi.data1 === button){
       this.pressHandler.handlePressEnd(midi.data1)
       return true
     }
@@ -577,6 +616,15 @@ class LiveLoopingController {
   #linn: LinnStrument
   #modules: ControllerModule[]
 
+  #width = 16
+  #height = 8
+  #noteOffset = 30  // note played by the lowest key in the play area
+  #controlAreaWidth = 5
+  #playAreaWidth = 11  // notes in each row of the play area
+  #rowOffset = 5  // distance in semitomes while going 1 row up
+  #noteColors: lightColor[] = ['orange', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off']
+  #firstControlAreaButton = 30
+
   constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument, modules: typeof ControllerModule[]){
     this.bitwig = bitwig
     this.pressHandler = pressHandler
@@ -585,55 +633,56 @@ class LiveLoopingController {
     this.#interfaceEnabled = true
     this.#keyTranslationTable = []
 
-    for(let key = 0; key < 128; key++){
-      if(key%16 > 4){
-        this.#keyTranslationTable.push(this.#buttonToNote(key))
-      }else{
-        this.#keyTranslationTable.push(-1)
-      }
-    }
-
-    // this.#linn.turnOffLights()
-
     this.bitwig.host.getMidiInPort(0).setMidiCallback((...args) => this.handleMidi(...args));
 
     this.bitwig.host.getMidiInPort(0)
-    this.#noteInput = this.bitwig.host.getMidiInPort(0).createNoteInput("LinnStrument", "??????")
+    this.#noteInput = this.bitwig.host.getMidiInPort(0).createNoteInput("LinnStrument", "?1????", "?2????", "?3????", "?4????", "?5????", "?6????", "?7????", "?8????", "?9????", "?A????", "?B????", "?C????", "?D????", "?E????", "?F????")
     this.#noteInput.setUseExpressiveMidi(true, 0, 24);
-    this.#noteInput.setKeyTranslationTable(this.#keyTranslationTable)
+
+    this.#setKeyTranslationTable()
 
     this.#setPlayAreaLights()
 
     this.#modules.forEach(module => module.init())
   }
 
-  #buttonToNote(buttonIndex: number): number{
-    const buttonOffset = 0  // number of the first button
-    const noteOffset = 30  // number of the first note
-    const buttonsPerRow = 16
-    const rowOffset = 5 // Distance in semitomes while going 1 row up
-    const rowDecrement = buttonsPerRow - rowOffset
+  coordinateToControlSplitButton({row, column}: {row: number, column: number}): number {
+    return this.#firstControlAreaButton + (7-row)*this.#controlAreaWidth + column
+  }
 
-    const currentRow = Math.floor((buttonIndex - buttonOffset)/buttonsPerRow)
+  controlSplitButtonToCoordinate(button: number): { row: number, column: number } {
+    const row = 7 - Math.floor((button - this.#firstControlAreaButton) / this.#controlAreaWidth)
+    const column = button % this.#controlAreaWidth
+    return { row, column } 
+  } 
+
+  #setKeyTranslationTable(){
+    this.#keyTranslationTable = []
+    for(let key = 0; key <= MAX_MIDI_NOTE; key++){
+      this.#keyTranslationTable.push(this.#buttonToNote(key))
+    }
+    this.#noteInput.setKeyTranslationTable(this.#keyTranslationTable)
+  }
+
+  #buttonToNote(buttonIndex: number): number{
+    const rowDecrement = this.#playAreaWidth - this.#rowOffset
+
+    const currentRow = Math.floor((buttonIndex)/this.#playAreaWidth)
     const rowAdjustment = currentRow*rowDecrement
-    const note = buttonIndex - buttonOffset - rowAdjustment + noteOffset
+    const note = buttonIndex - rowAdjustment + this.#noteOffset
 
     return note
   }
 
   #setPlayAreaLights(){
-    const module = 12
-    println(String(this.#interfaceEnabled))
-    if(this.isInterfaceEnabled()){
-      for(let button = 0; button < this.#keyTranslationTable.length; button++){
-        if(button%16 > 4 && this.#keyTranslationTable[button] % module === 0){
-          this.setButtonLight(button, "orange", true)
-        }
-      }
-    }else{
-      for(let button = 0; button < this.#keyTranslationTable.length; button++){
-        if(this.#keyTranslationTable[button] % module === 0){
-          this.setButtonLight(button, "orange", true)
+    for(let row = 0; row < this.#height; row++){
+      for(let column = 0; column < this.#width; column++){
+        const playAreaColumn = column - this.#controlAreaWidth
+        if(playAreaColumn >= 0){
+          const playAreaButton = row * this.#playAreaWidth + playAreaColumn
+          const note = this.#buttonToNote(playAreaButton) % 12
+          const color = this.#noteColors[note]
+          this.setLight({row: 7-row as row, column: column as column, color})
         }
       }
     }
@@ -672,11 +721,7 @@ class LiveLoopingController {
       }
     }else{
       for(let key = 0; key < 128; key++){
-        if(key%16 > 4){
-          newTranslationTable.push(this.#buttonToNote(key))
-        }else{
-          newTranslationTable.push(-1)
-        }
+        newTranslationTable.push(this.#buttonToNote(key))
       }
     }
     this.#keyTranslationTable = newTranslationTable
@@ -730,7 +775,7 @@ function init() {
   const bitwig = new Bitwig(host)
   const linn = new LinnStrument(bitwig)
 
-  const modules = [
+  const modules: typeof ControllerModule[] = [
     TracksRow,
     ClipArray,
     LoopLength,
