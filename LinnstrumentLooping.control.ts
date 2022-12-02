@@ -43,6 +43,13 @@ const CC = 11
 
 const MAX_MIDI_NOTE = 127
 
+function sleep(milliseconds: number) {
+  const date = Date.now();
+  let currentDate = null;
+  do {
+    currentDate = Date.now();
+  } while (currentDate - date < milliseconds);
+}
 
 //  ___      ___   _______  ______    _______  ______    __   __
 // |   |    |   | |  _    ||    _ |  |   _   ||    _ |  |  | |  |
@@ -110,6 +117,8 @@ class Bitwig {
 // This class contains some helper methods to control the linnstrument more
 // easily. All is done through the Bitwig interface.
 
+type Split = "left" | "right"
+
 class LinnStrument {
   #bitwig: Bitwig
 
@@ -140,6 +149,112 @@ class LinnStrument {
         this.setLight({row, column, color: "off"})
       })
     })
+  }
+
+  sendNRPN(number: number, value: number) {
+    const MSBNumber = number >> 7
+    const LSBNumber = number % 128
+    const MSBValue = value >> 7
+    const LSBValue = value % 128
+
+    this.#bitwig.midiOut({ type: CC, channel: 0, data1: 99, data2: MSBNumber })
+    this.#bitwig.midiOut({ type: CC, channel: 0, data1: 98, data2: LSBNumber })
+    this.#bitwig.midiOut({ type: CC, channel: 0, data1: 6, data2: MSBValue })
+    this.#bitwig.midiOut({ type: CC, channel: 0, data1: 38, data2: LSBValue })
+    this.#bitwig.midiOut({ type: CC, channel: 0, data1: 101, data2: 127 })
+    this.#bitwig.midiOut({ type: CC, channel: 0, data1: 100, data2: 127 })
+    sleep(35)
+  }
+
+
+  setMidiMode(mode: "OneChannel" | "ChannelPerNote" | "ChannelPerRow", split: Split){
+    let value
+    if(mode == "OneChannel"){
+      value = 0
+    }else if(mode == "ChannelPerNote"){
+      value = 1
+    }else{
+      value = 2
+    }
+
+    this.sendNRPN(split == "left" ? 0: 100, value)
+  }
+
+  /**
+   * 
+   * @param value only supports, 0: No overlap, 3 4 5 6 7 12: Intervals, 13: Guitar, 127: 0 offset
+   */
+  setRowOffset(value: number){
+    this.sendNRPN(227, value)
+  }
+
+  /**
+   * 
+   * @param channel From 0 to 15
+   */
+  setMidiMainChannel(channel: number, split: Split){
+    this.sendNRPN(split == "left" ? 1: 101, channel+1)
+  }
+
+  /**
+   * 
+   * @param channel From 0 to 15
+   * @param enabled 
+   */
+  setMidiPerNoteChannel(channel: number, enabled: boolean, split: Split){
+    this.sendNRPN(split == "left" ? 2+channel : 102+channel, enabled? 1: 0)
+  }
+
+  /**
+   * 
+   * @param range From 1 to 96
+   */
+  setMidiBendRange(range: number, split: Split){
+    this.sendNRPN(split === "left" ? 19 : 119, range)
+  }
+
+  /**
+   * 
+   * @param octaves 0-10, 5 is +0
+   * @param semitones 0-14, 0-6: -7 to -1, 7: 0, 8-14: +1 to +7
+   */
+  setTransposition(octaves: number, semitones: number){
+    // Left Octave
+    this.sendNRPN(36, octaves)
+    // Left Pitch
+    this.sendNRPN(37, semitones)
+    // Right Octave
+    this.sendNRPN(136, octaves)
+    // Right Pitch
+    this.sendNRPN(137, semitones)
+  }
+
+  setSplitActive(active: boolean){
+    this.sendNRPN(200, active? 1 : 0)
+  }
+
+  /**
+   * 
+   * @param column Start of second split: 2-25
+   */
+  setSplitPoint(column: number){
+    this.sendNRPN(202, column)
+  }
+
+  // Below this line: unused and not tested
+  setPitchQuantize(enabled: boolean, split: Split){
+    this.sendNRPN(split == "left"? 21 : 121, enabled ? 1 : 0)
+  }
+
+  setPitchQuantizeHold(mode: "Off" | "Medium" | "Fast" | "Slow", split: Split){
+    const translation = {
+      "Off": 0, "Medium": 1, "Fast": 2, "Slow": 3
+    }
+    this.sendNRPN(split == "left"? 22 : 122, translation[mode])
+  }
+
+  setSendX(enabled: boolean, split: Split){
+    this.sendNRPN(split == "left"? 20 : 120, enabled ? 1 : 0)
   }
 }
 
@@ -614,6 +729,7 @@ class LiveLoopingController {
   #noteInput: API.NoteInput
   #interfaceEnabled: boolean
   #linn: LinnStrument
+  linn: LinnStrument
   #modules: ControllerModule[]
 
   #width = 16
@@ -623,12 +739,13 @@ class LiveLoopingController {
   #playAreaWidth = 11  // notes in each row of the play area
   #rowOffset = 5  // distance in semitomes while going 1 row up
   #noteColors: lightColor[] = ['orange', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off']
-  #firstControlAreaButton = 30
+  #firstControlAreaButton = 0
 
   constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument, modules: typeof ControllerModule[]){
     this.bitwig = bitwig
     this.pressHandler = pressHandler
     this.#linn = linnstrument
+    this.linn = linnstrument
     this.#modules = modules.map(module => new module(bitwig, pressHandler, linnstrument, this))
     this.#interfaceEnabled = true
     this.#keyTranslationTable = []
@@ -641,9 +758,30 @@ class LiveLoopingController {
 
     this.#setKeyTranslationTable()
 
+    this.configureLinnstrument()
     this.#setPlayAreaLights()
 
     this.#modules.forEach(module => module.init())
+  }
+
+  configureLinnstrument() {
+    // Global settings
+    this.#linn.setRowOffset(0)
+    this.#linn.setTransposition(3, 1)
+    this.#linn.setSplitActive(true)
+    this.#linn.setSplitPoint(6)
+    
+    // Left split
+    this.#linn.setMidiBendRange(48, 'left')
+    this.#linn.setMidiMode("OneChannel", 'left')
+    this.#linn.setMidiMainChannel(0, 'left')
+    
+    // Right split
+    this.#linn.setMidiBendRange(48, 'right')
+    this.#linn.setMidiMode("ChannelPerNote", 'right')
+    Array(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15).forEach(i => {
+      this.#linn.setMidiPerNoteChannel(i, true, 'right')
+    })
   }
 
   coordinateToControlSplitButton({row, column}: {row: number, column: number}): number {

@@ -33,6 +33,13 @@ const NOTE_OFF = 8;
 const NOTE_ON = 9;
 const CC = 11;
 const MAX_MIDI_NOTE = 127;
+function sleep(milliseconds) {
+    const date = Date.now();
+    let currentDate = null;
+    do {
+        currentDate = Date.now();
+    } while (currentDate - date < milliseconds);
+}
 //  ___      ___   _______  ______    _______  ______    __   __
 // |   |    |   | |  _    ||    _ |  |   _   ||    _ |  |  | |  |
 // |   |    |   | | |_|   ||   | ||  |  |_|  ||   | ||  |  |_|  |
@@ -76,14 +83,6 @@ class Bitwig {
         this.host.getMidiOutPort(0).sendMidi(status, data1, data2);
     }
 }
-//  _ _                 _                                   _
-// | (_)               | |                                 | |
-// | |_ _ __  _ __  ___| |_ _ __ _   _ _ __ ___   ___ _ __ | |_
-// | | | '_ \| '_ \/ __| __| '__| | | | '_ ` _ \ / _ \ '_ \| __|
-// | | | | | | | | \__ \ |_| |  | |_| | | | | | |  __/ | | | |
-// |_|_|_| |_|_| |_|___/\__|_|   \__,_|_| |_| |_|\___|_| |_|\__|
-// This class contains some helper methods to control the linnstrument more
-// easily. All is done through the Bitwig interface.
 class LinnStrument {
     constructor(bitwig) {
         _LinnStrument_bitwig.set(this, void 0);
@@ -110,6 +109,99 @@ class LinnStrument {
                 this.setLight({ row, column, color: "off" });
             });
         });
+    }
+    sendNRPN(number, value) {
+        const MSBNumber = number >> 7;
+        const LSBNumber = number % 128;
+        const MSBValue = value >> 7;
+        const LSBValue = value % 128;
+        __classPrivateFieldGet(this, _LinnStrument_bitwig, "f").midiOut({ type: CC, channel: 0, data1: 99, data2: MSBNumber });
+        __classPrivateFieldGet(this, _LinnStrument_bitwig, "f").midiOut({ type: CC, channel: 0, data1: 98, data2: LSBNumber });
+        __classPrivateFieldGet(this, _LinnStrument_bitwig, "f").midiOut({ type: CC, channel: 0, data1: 6, data2: MSBValue });
+        __classPrivateFieldGet(this, _LinnStrument_bitwig, "f").midiOut({ type: CC, channel: 0, data1: 38, data2: LSBValue });
+        __classPrivateFieldGet(this, _LinnStrument_bitwig, "f").midiOut({ type: CC, channel: 0, data1: 101, data2: 127 });
+        __classPrivateFieldGet(this, _LinnStrument_bitwig, "f").midiOut({ type: CC, channel: 0, data1: 100, data2: 127 });
+        sleep(35);
+    }
+    setMidiMode(mode, split) {
+        let value;
+        if (mode == "OneChannel") {
+            value = 0;
+        }
+        else if (mode == "ChannelPerNote") {
+            value = 1;
+        }
+        else {
+            value = 2;
+        }
+        this.sendNRPN(split == "left" ? 0 : 100, value);
+    }
+    /**
+     *
+     * @param value only supports, 0: No overlap, 3 4 5 6 7 12: Intervals, 13: Guitar, 127: 0 offset
+     */
+    setRowOffset(value) {
+        this.sendNRPN(227, value);
+    }
+    /**
+     *
+     * @param channel From 0 to 15
+     */
+    setMidiMainChannel(channel, split) {
+        this.sendNRPN(split == "left" ? 1 : 101, channel + 1);
+    }
+    /**
+     *
+     * @param channel From 0 to 15
+     * @param enabled
+     */
+    setMidiPerNoteChannel(channel, enabled, split) {
+        this.sendNRPN(split == "left" ? 2 + channel : 102 + channel, enabled ? 1 : 0);
+    }
+    /**
+     *
+     * @param range From 1 to 96
+     */
+    setMidiBendRange(range, split) {
+        this.sendNRPN(split === "left" ? 19 : 119, range);
+    }
+    /**
+     *
+     * @param octaves 0-10, 5 is +0
+     * @param semitones 0-14, 0-6: -7 to -1, 7: 0, 8-14: +1 to +7
+     */
+    setTransposition(octaves, semitones) {
+        // Left Octave
+        this.sendNRPN(36, octaves);
+        // Left Pitch
+        this.sendNRPN(37, semitones);
+        // Right Octave
+        this.sendNRPN(136, octaves);
+        // Right Pitch
+        this.sendNRPN(137, semitones);
+    }
+    setSplitActive(active) {
+        this.sendNRPN(200, active ? 1 : 0);
+    }
+    /**
+     *
+     * @param column Start of second split: 2-25
+     */
+    setSplitPoint(column) {
+        this.sendNRPN(202, column);
+    }
+    // Below this line: unused and not tested
+    setPitchQuantize(enabled, split) {
+        this.sendNRPN(split == "left" ? 21 : 121, enabled ? 1 : 0);
+    }
+    setPitchQuantizeHold(mode, split) {
+        const translation = {
+            "Off": 0, "Medium": 1, "Fast": 2, "Slow": 3
+        };
+        this.sendNRPN(split == "left" ? 22 : 122, translation[mode]);
+    }
+    setSendX(enabled, split) {
+        this.sendNRPN(split == "left" ? 20 : 120, enabled ? 1 : 0);
     }
 }
 _LinnStrument_bitwig = new WeakMap();
@@ -516,10 +608,11 @@ class LiveLoopingController {
         _LiveLoopingController_playAreaWidth.set(this, 11); // notes in each row of the play area
         _LiveLoopingController_rowOffset.set(this, 5); // distance in semitomes while going 1 row up
         _LiveLoopingController_noteColors.set(this, ['orange', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off']);
-        _LiveLoopingController_firstControlAreaButton.set(this, 30);
+        _LiveLoopingController_firstControlAreaButton.set(this, 0);
         this.bitwig = bitwig;
         this.pressHandler = pressHandler;
         __classPrivateFieldSet(this, _LiveLoopingController_linn, linnstrument, "f");
+        this.linn = linnstrument;
         __classPrivateFieldSet(this, _LiveLoopingController_modules, modules.map(module => new module(bitwig, pressHandler, linnstrument, this)), "f");
         __classPrivateFieldSet(this, _LiveLoopingController_interfaceEnabled, true, "f");
         __classPrivateFieldSet(this, _LiveLoopingController_keyTranslationTable, [], "f");
@@ -528,8 +621,26 @@ class LiveLoopingController {
         __classPrivateFieldSet(this, _LiveLoopingController_noteInput, this.bitwig.host.getMidiInPort(0).createNoteInput("LinnStrument", "?1????", "?2????", "?3????", "?4????", "?5????", "?6????", "?7????", "?8????", "?9????", "?A????", "?B????", "?C????", "?D????", "?E????", "?F????"), "f");
         __classPrivateFieldGet(this, _LiveLoopingController_noteInput, "f").setUseExpressiveMidi(true, 0, 24);
         __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_setKeyTranslationTable).call(this);
+        this.configureLinnstrument();
         __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_setPlayAreaLights).call(this);
         __classPrivateFieldGet(this, _LiveLoopingController_modules, "f").forEach(module => module.init());
+    }
+    configureLinnstrument() {
+        // Global settings
+        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setRowOffset(0);
+        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setTransposition(3, 1);
+        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setSplitActive(true);
+        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setSplitPoint(6);
+        // Left split
+        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiBendRange(48, 'left');
+        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiMode("OneChannel", 'left');
+        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiMainChannel(0, 'left');
+        // Right split
+        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiBendRange(48, 'right');
+        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiMode("ChannelPerNote", 'right');
+        Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15).forEach(i => {
+            __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiPerNoteChannel(i, true, 'right');
+        });
     }
     coordinateToControlSplitButton({ row, column }) {
         return __classPrivateFieldGet(this, _LiveLoopingController_firstControlAreaButton, "f") + (7 - row) * __classPrivateFieldGet(this, _LiveLoopingController_controlAreaWidth, "f") + column;
