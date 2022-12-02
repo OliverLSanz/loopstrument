@@ -163,7 +163,7 @@ class LinnStrument {
     this.#bitwig.midiOut({ type: CC, channel: 0, data1: 38, data2: LSBValue })
     this.#bitwig.midiOut({ type: CC, channel: 0, data1: 101, data2: 127 })
     this.#bitwig.midiOut({ type: CC, channel: 0, data1: 100, data2: 127 })
-    sleep(35)
+    sleep(50)
   }
 
 
@@ -239,6 +239,10 @@ class LinnStrument {
    */
   setSplitPoint(column: number){
     this.sendNRPN(202, column)
+  }
+
+  setSelectedSplit(split: Split){
+    this.sendNRPN(201, split == "left" ? 0 : 1)
   }
 
   // Below this line: unused and not tested
@@ -378,12 +382,6 @@ class TracksRow extends ControllerModule {
   #row = 0
   #column = 0
   #numberOfTracks = 5
-  #baseButton: number
-
-  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument, controller: LiveLoopingController) {
-    super(bitwig, pressHandler, linnstrument, controller)
-    this.#baseButton = this.controller.coordinateToControlSplitButton({row: this.#row, column: this.#column})
-  }
 
   init(): void {
     for (let trackIndex = 0; trackIndex < this.#numberOfTracks; trackIndex++) {
@@ -398,9 +396,10 @@ class TracksRow extends ControllerModule {
 
   handleMidi(midi: MidiMessage): boolean {
     // SWITCH TRACKS
+    const baseButton = this.controller.coordinateToControlSplitButton({row: this.#row, column: this.#column})
 
     for (let trackIndex = 0; trackIndex < this.#numberOfTracks; trackIndex++) {
-      if (midi.type === NOTE_ON && midi.data1 === this.#baseButton+trackIndex) {
+      if (midi.type === NOTE_ON && midi.data1 === baseButton+trackIndex) {
         this.bitwig.armTrack(trackIndex)
         return true
       }
@@ -415,12 +414,6 @@ class ClipArray extends ControllerModule {
   #column = 0
   #numberOfTracks = 5
   #clipsPerTrack = 3
-  #baseButton: number
-
-  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument, controller: LiveLoopingController) {
-    super(bitwig, pressHandler, linnstrument, controller)
-    this.#baseButton = this.controller.coordinateToControlSplitButton({row: this.#row, column: this.#column})
-  }
 
   init(): void{
     // Start observers
@@ -649,15 +642,6 @@ class InterfaceToggle extends ControllerModule {
   #rowWhileDisabled = 7
   #columnWhileDisabled = 0
 
-  #buttonWhileEnabled: number
-  #buttonWhileDisabled: number
-
-  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument, controller: LiveLoopingController) {
-    super(bitwig, pressHandler, linnstrument, controller)
-    this.#buttonWhileEnabled = this.controller.coordinateToControlSplitButton({row: this.#rowWhileEnabled, column: this.#columnWhileEnabled})
-    this.#buttonWhileDisabled = this.controller.coordinateToControlSplitButton({row: this.#rowWhileDisabled, column: this.#columnWhileDisabled})
-  }
-  
   init(): void {
     this.addInitCallback(() => {
       if(this.controller.isInterfaceEnabled()){
@@ -669,16 +653,18 @@ class InterfaceToggle extends ControllerModule {
   }
 
   handleMidi(midi: MidiMessage): boolean {
+    const buttonWhileEnabled = this.controller.coordinateToControlSplitButton({row: this.#rowWhileEnabled, column: this.#columnWhileEnabled})
+    const buttonWhileDisabled = 0
+
     if(this.controller.isInterfaceEnabled()){
-      if (midi.type === NOTE_ON && midi.data1 === this.#buttonWhileEnabled) {
+      if (midi.type === NOTE_ON && midi.data1 === buttonWhileEnabled) {
         this.controller.toggleInterface()
         return true
       }
       return false
     }
-    println(String(midi.data1))
-    if(midi.type === NOTE_ON && midi.data1 === this.#buttonWhileDisabled){
-        this.controller.toggleInterface()
+    if(midi.type === NOTE_ON && midi.data1 === buttonWhileDisabled){
+      this.controller.toggleInterface()
       return true
     }
 
@@ -736,7 +722,8 @@ class LiveLoopingController {
   #height = 8
   #noteOffset = 30  // note played by the lowest key in the play area
   #controlAreaWidth = 5
-  #playAreaWidth = 11  // notes in each row of the play area
+  #collapsedControlAreaWidth = 0
+  #expandedControlAreaWidth = 5
   #rowOffset = 5  // distance in semitomes while going 1 row up
   #noteColors: lightColor[] = ['orange', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off']
   #firstControlAreaButton = 0
@@ -756,15 +743,14 @@ class LiveLoopingController {
     this.#noteInput = this.bitwig.host.getMidiInPort(0).createNoteInput("LinnStrument", "?1????", "?2????", "?3????", "?4????", "?5????", "?6????", "?7????", "?8????", "?9????", "?A????", "?B????", "?C????", "?D????", "?E????", "?F????")
     this.#noteInput.setUseExpressiveMidi(true, 0, 24);
 
-    this.#setKeyTranslationTable()
-
-    this.configureLinnstrument()
-    this.#setPlayAreaLights()
+    this.#configureLinnstrument()
 
     this.#modules.forEach(module => module.init())
+
+    this.#update()
   }
 
-  configureLinnstrument() {
+  #configureLinnstrument() {
     // Global settings
     this.#linn.setRowOffset(0)
     this.#linn.setTransposition(3, 1)
@@ -784,7 +770,14 @@ class LiveLoopingController {
     })
   }
 
+  #getPlayAreaWidth(){
+    return this.#width - this.#controlAreaWidth
+  }
+
   coordinateToControlSplitButton({row, column}: {row: number, column: number}): number {
+    if(!this.#interfaceEnabled){
+      return 999
+    }
     return this.#firstControlAreaButton + (7-row)*this.#controlAreaWidth + column
   }
 
@@ -794,20 +787,21 @@ class LiveLoopingController {
     return { row, column } 
   } 
 
-  #setKeyTranslationTable(){
-    this.#keyTranslationTable = []
-    for(let key = 0; key <= MAX_MIDI_NOTE; key++){
-      this.#keyTranslationTable.push(this.#buttonToNote(key))
-    }
-    this.#noteInput.setKeyTranslationTable(this.#keyTranslationTable)
-  }
-
   #buttonToNote(buttonIndex: number): number{
-    const rowDecrement = this.#playAreaWidth - this.#rowOffset
+    let interfaceOffset = 0
 
-    const currentRow = Math.floor((buttonIndex)/this.#playAreaWidth)
+    // This ensures the same notes are played by the same buttons
+    // regardless of the interface state
+    if(this.#interfaceEnabled){
+      const columnDifference = this.#expandedControlAreaWidth - this.#collapsedControlAreaWidth
+      interfaceOffset = columnDifference
+    }
+
+    const rowDecrement = this.#getPlayAreaWidth() - this.#rowOffset
+
+    const currentRow = Math.floor((buttonIndex)/this.#getPlayAreaWidth())
     const rowAdjustment = currentRow*rowDecrement
-    const note = buttonIndex - rowAdjustment + this.#noteOffset
+    const note = buttonIndex - rowAdjustment + this.#noteOffset + interfaceOffset
 
     return note
   }
@@ -817,10 +811,10 @@ class LiveLoopingController {
       for(let column = 0; column < this.#width; column++){
         const playAreaColumn = column - this.#controlAreaWidth
         if(playAreaColumn >= 0){
-          const playAreaButton = row * this.#playAreaWidth + playAreaColumn
+          const playAreaButton = row * this.#getPlayAreaWidth() + playAreaColumn
           const note = this.#buttonToNote(playAreaButton) % 12
           const color = this.#noteColors[note]
-          this.setLight({row: 7-row as row, column: column as column, color})
+          this.setLight({row: 7-row as row, column: column as column, color}, true)
         }
       }
     }
@@ -834,11 +828,6 @@ class LiveLoopingController {
     this.setLight({row: 7 - row as row, column: column as column, color}, force)
   }
 
-  forwardButton(buttonIndex: number, forward: boolean){
-    this.#keyTranslationTable[buttonIndex] = forward ? buttonIndex : -1
-    this.#noteInput.setKeyTranslationTable(this.#keyTranslationTable)
-  }
-
   handleMidi(status: number, data1: number, data2: number){
     const type = status >> 4
     const channel = status % 16
@@ -847,40 +836,58 @@ class LiveLoopingController {
     this.#modules.some(module => module.handleMidi({type, channel, data1, data2}))
   }
 
-  toggleInterface(){
+  #updateKeyTranslationTable(){
     const newTranslationTable = []
     if(this.#interfaceEnabled){
-      for(let key = 0; key < 128; key++){
+      for(let key = 0; key <= MAX_MIDI_NOTE; key++){
+        newTranslationTable.push(this.#buttonToNote(key))
+      }
+    }else{
+      for(let key = 0; key <= MAX_MIDI_NOTE; key++){
         if(key != 0){
           newTranslationTable.push(this.#buttonToNote(key))
         }else{
           newTranslationTable.push(-1)
         }
       }
-    }else{
-      for(let key = 0; key < 128; key++){
-        newTranslationTable.push(this.#buttonToNote(key))
-      }
     }
     this.#keyTranslationTable = newTranslationTable
     this.#noteInput.setKeyTranslationTable(this.#keyTranslationTable)
+  }
+
+  toggleInterface(){
     this.#interfaceEnabled = !this.#interfaceEnabled
-    this.forceUpdate()
+    this.#update()
   }
 
   isInterfaceEnabled(){
     return this.#interfaceEnabled
   }
 
-  forceUpdate(){
+  #update(){
+    if(this.#interfaceEnabled){
+      this.#controlAreaWidth = this.#expandedControlAreaWidth
+    }else{
+      this.#controlAreaWidth = this.#collapsedControlAreaWidth
+    }
+
+    this.#updateKeyTranslationTable()
+
+    if(this.#interfaceEnabled){
+      this.#linn.setSplitActive(true)
+    }else{
+      this.#linn.setSelectedSplit("right")
+      this.#linn.setSplitActive(false)
+    }
+
     if(this.#interfaceEnabled){
       this.#linn.turnOffLights()
     } else {
       this.#linn.resetLights()
     }
 
-    this.#modules.forEach(module => module.update())
     this.#setPlayAreaLights()
+    this.#modules.forEach(module => module.update())
   }
 
   setLight(options: {row: row, column: column, color: lightColor}, force: boolean = false){
