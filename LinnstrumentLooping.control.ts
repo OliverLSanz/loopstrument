@@ -778,6 +778,10 @@ class Metronome extends ControllerModule {
   }
 }
 
+interface ControllerOptions {
+  expandedControlAreaWidth: number
+}
+
 class LiveLoopingController {
   bitwig: Bitwig
   pressHandler: PressHandler
@@ -787,25 +791,28 @@ class LiveLoopingController {
   #linn: LinnStrument
   linn: LinnStrument
   #modules: ControllerModule[]
+  #controlAreaWidth: number
+
+  #options: ControllerOptions
 
   #width = 16
   #height = 8
   #noteOffset = 30  // note played by the lowest key in the play area
-  #controlAreaWidth = 5
   #collapsedControlAreaWidth = 0
-  #expandedControlAreaWidth = 5
   #rowOffset = 5  // distance in semitomes while going 1 row up
   #noteColors: lightColor[] = ['orange', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off']
   #firstControlAreaButton = 0
 
-  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument){
+  constructor(bitwig: Bitwig, pressHandler: PressHandler, linnstrument: LinnStrument, options: ControllerOptions){
     this.bitwig = bitwig
     this.pressHandler = pressHandler
     this.#linn = linnstrument
     this.linn = linnstrument
+    this.#options = options
     this.#modules = []
     this.#interfaceEnabled = true
     this.#keyTranslationTable = []
+    this.#controlAreaWidth = this.#options.expandedControlAreaWidth
 
     this.#noteInput = this.bitwig.host.getMidiInPort(0).createNoteInput("LinnStrument", "?1????", "?2????", "?3????", "?4????", "?5????", "?6????", "?7????", "?8????", "?9????", "?A????", "?B????", "?C????", "?D????", "?E????", "?F????")
     this.#noteInput.setUseExpressiveMidi(true, 0, 24);
@@ -830,7 +837,7 @@ class LiveLoopingController {
     this.#linn.setRowOffset(0)
     this.#linn.setTransposition(3, 1)
     this.#linn.setSplitActive(true)
-    this.#linn.setSplitPoint(6)
+    this.#linn.setSplitPoint(this.#controlAreaWidth+1)
     
     // Left split
     this.#linn.setMidiBendRange(48, 'left')
@@ -868,7 +875,7 @@ class LiveLoopingController {
     // This ensures the same notes are played by the same buttons
     // regardless of the interface state
     if(this.#interfaceEnabled){
-      const columnDifference = this.#expandedControlAreaWidth - this.#collapsedControlAreaWidth
+      const columnDifference = this.#options.expandedControlAreaWidth - this.#collapsedControlAreaWidth
       interfaceOffset = columnDifference
     }
 
@@ -890,6 +897,8 @@ class LiveLoopingController {
           const note = this.#buttonToNote(playAreaButton) % 12
           const color = this.#noteColors[note]
           this.setLight({row: 7-row as row, column: column as column, color}, true)
+        }else{
+          this.setLight({row: 7-row as row, column: column as column, color: "off"}, true)
         }
       }
     }
@@ -941,7 +950,7 @@ class LiveLoopingController {
 
   #update(){
     if(this.#interfaceEnabled){
-      this.#controlAreaWidth = this.#expandedControlAreaWidth
+      this.#controlAreaWidth = this.#options.expandedControlAreaWidth
     }else{
       this.#controlAreaWidth = this.#collapsedControlAreaWidth
     }
@@ -995,7 +1004,7 @@ function init() {
   const bitwig = new Bitwig(host)
   const linn = new LinnStrument(bitwig)
 
-  const controller = new LiveLoopingController(bitwig, pressHandler, linn)
+  const controller = new LiveLoopingController(bitwig, pressHandler, linn, {expandedControlAreaWidth: 6})
 
   const context: ModuleContext = {
     bitwig: bitwig,
