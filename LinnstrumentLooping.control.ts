@@ -840,12 +840,12 @@ class LiveLoopingController {
     this.#linn.setSplitPoint(this.#controlAreaWidth+1)
     
     // Left split
-    this.#linn.setMidiBendRange(48, 'left')
+    this.#linn.setMidiBendRange(24, 'left')
     this.#linn.setMidiMode("OneChannel", 'left')
     this.#linn.setMidiMainChannel(0, 'left')
     
     // Right split
-    this.#linn.setMidiBendRange(48, 'right')
+    this.#linn.setMidiBendRange(24, 'right')
     this.#linn.setMidiMode("ChannelPerNote", 'right')
     Array(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15).forEach(i => {
       this.#linn.setMidiPerNoteChannel(i, true, 'right')
@@ -1004,7 +1004,7 @@ function init() {
   const bitwig = new Bitwig(host)
   const linn = new LinnStrument(bitwig)
 
-  const controller = new LiveLoopingController(bitwig, pressHandler, linn, {expandedControlAreaWidth: 6})
+  const controller = new LiveLoopingController(bitwig, pressHandler, linn, {expandedControlAreaWidth: 5})
 
   const context: ModuleContext = {
     bitwig: bitwig,

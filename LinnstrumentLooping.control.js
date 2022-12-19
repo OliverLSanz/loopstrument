@@ -662,11 +662,11 @@ _LiveLoopingController_keyTranslationTable = new WeakMap(), _LiveLoopingControll
     __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setSplitActive(true);
     __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setSplitPoint(__classPrivateFieldGet(this, _LiveLoopingController_controlAreaWidth, "f") + 1);
     // Left split
-    __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiBendRange(48, 'left');
+    __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiBendRange(24, 'left');
     __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiMode("OneChannel", 'left');
     __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiMainChannel(0, 'left');
     // Right split
-    __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiBendRange(48, 'right');
+    __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiBendRange(24, 'right');
     __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiMode("ChannelPerNote", 'right');
     Array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15).forEach(i => {
         __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setMidiPerNoteChannel(i, true, 'right');
@@ -761,7 +761,7 @@ function init() {
     const pressHandler = new PressHandler(taskManager);
     const bitwig = new Bitwig(host);
     const linn = new LinnStrument(bitwig);
-    const controller = new LiveLoopingController(bitwig, pressHandler, linn, { expandedControlAreaWidth: 6 });
+    const controller = new LiveLoopingController(bitwig, pressHandler, linn, { expandedControlAreaWidth: 5 });
     const context = {
         bitwig: bitwig,
         pressHandler: pressHandler,
