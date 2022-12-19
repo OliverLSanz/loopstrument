@@ -83,7 +83,7 @@ class Bitwig {
   constructor(host: API.ControllerHost){
     this.host = host
     this.transport = host.createTransport()
-    this.tracks = host.createMainTrackBank(5, 0, 3)
+    this.tracks = host.createMainTrackBank(15, 0, 8)
     this.application = host.createApplication()
   }
 
@@ -1015,7 +1015,7 @@ function init() {
 
   const modules: ControllerModule[] = [
     new TracksRow(context, {row: 0, column: 0, numberOfTracks: 5}),
-    new ClipArray(context, {row: 1, column: 0, numberOfTracks: 5, clipsPerTrack: 3}),
+    new ClipArray(context, {row: 1, column: 0, numberOfTracks: 5, clipsPerTrack: 4}),
     new LoopLength(context, {row: 6, column: 0}),
     new UndoRedo(context, {row: 7, column: 3}),
     new OverdubToggle(context, {row: 7, column: 0}),
