@@ -388,7 +388,8 @@ class ControllerModule {
 interface TracksRowOptions {
   row: number,
   column: number, 
-  numberOfTracks: number
+  numberOfTracks: number,
+  firstTrackIndex: number
 }
 
 class TracksRow extends ControllerModule {
@@ -401,7 +402,7 @@ class TracksRow extends ControllerModule {
 
   init(): void {
     for (let trackIndex = 0; trackIndex < this.#options.numberOfTracks; trackIndex++) {
-      const track = this.bitwig.tracks.getItemAt(trackIndex)
+      const track = this.bitwig.tracks.getItemAt(trackIndex + this.#options.firstTrackIndex)
 
       this.addValueObserver(track.arm(), () => {
         const isArmed = track.arm().get()
@@ -416,7 +417,7 @@ class TracksRow extends ControllerModule {
 
     for (let trackIndex = 0; trackIndex < this.#options.numberOfTracks; trackIndex++) {
       if (midi.type === NOTE_ON && midi.data1 === baseButton+trackIndex) {
-        this.bitwig.armTrack(trackIndex)
+        this.bitwig.armTrack(trackIndex + this.#options.firstTrackIndex)
         return true
       }
     }
@@ -429,7 +430,8 @@ interface ClipArrayOptions {
   row: number,
   column: number,
   numberOfTracks: number,
-  clipsPerTrack: number
+  firstTrackIndex: number,
+  clipsPerTrack: number,
 }
 
 class ClipArray extends ControllerModule {
@@ -443,7 +445,8 @@ class ClipArray extends ControllerModule {
   init(): void{
     // Start observers
     for (let trackIndex = 0; trackIndex < this.#options.numberOfTracks; trackIndex++) {
-      const track = this.bitwig.tracks.getItemAt(trackIndex)
+      const track = this.bitwig.tracks.getItemAt(trackIndex + this.#options.firstTrackIndex)
+      track.arm().markInterested()
 
       for (let clipIndex = 0; clipIndex < this.#options.clipsPerTrack; clipIndex++) {
         const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
@@ -473,10 +476,14 @@ class ClipArray extends ControllerModule {
         const trackIndex = column - this.#options.column
         const clipIndex = row - this.#options.row
 
-        const track = this.bitwig.tracks.getItemAt(trackIndex)
+        const track = this.bitwig.tracks.getItemAt(trackIndex + this.#options.firstTrackIndex)
         const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
-
+        const bitwig = this.bitwig
+        const firstTrackIndex = this.#options.firstTrackIndex
         function onTap() {
+          if(!clip.hasContent().getAsBoolean() && !track.arm().get()){
+            bitwig.armTrack(trackIndex + firstTrackIndex) 
+          }
           if (clip.isPlaying().getAsBoolean()) {
             track.stop()
           } else {
@@ -504,19 +511,19 @@ class ClipArray extends ControllerModule {
     const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
 
     if (clip.isRecording().getAsBoolean()) {
-      this.controller.setLight({ row: clipIndex + 1 as row, column: trackIndex as column, color: "red" })
+      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: "red" })
       return
     }
     if (clip.isPlaying().getAsBoolean()) {
-      this.controller.setLight({ row: clipIndex + 1 as row, column: trackIndex as column, color: "blue" })
+      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: "blue" })
       return
     }
     if (clip.hasContent().getAsBoolean()) {
-      this.controller.setLight({ row: clipIndex + 1 as row, column: trackIndex as column, color: "white" })
+      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: "white" })
       return
     }
     // Clip is empty
-    this.controller.setLight({ row: clipIndex + 1 as row, column: trackIndex as column, color: "off" })
+    this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: "off" })
   }
 }
 
@@ -1014,13 +1021,14 @@ function init() {
   }
 
   const modules: ControllerModule[] = [
-    new TracksRow(context, {row: 0, column: 0, numberOfTracks: 5}),
-    new ClipArray(context, {row: 1, column: 0, numberOfTracks: 5, clipsPerTrack: 4}),
+    new TracksRow(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5}),
+    new ClipArray(context, {row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4}),
     new LoopLength(context, {row: 6, column: 0}),
     new UndoRedo(context, {row: 7, column: 3}),
     new OverdubToggle(context, {row: 7, column: 0}),
     new InterfaceToggle(context, { rowWhileEnabled: 7, columnWhileEnabled: 4, rowWhileDisabled: 7, columnWhileDisabled: 0 }),
     new Metronome(context, {row: 7, column: 1}),
+    new ClipArray(context, {row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1})
   ]
 
   controller.addModules(modules)

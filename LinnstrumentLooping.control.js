@@ -289,7 +289,7 @@ class TracksRow extends ControllerModule {
     }
     init() {
         for (let trackIndex = 0; trackIndex < __classPrivateFieldGet(this, _TracksRow_options, "f").numberOfTracks; trackIndex++) {
-            const track = this.bitwig.tracks.getItemAt(trackIndex);
+            const track = this.bitwig.tracks.getItemAt(trackIndex + __classPrivateFieldGet(this, _TracksRow_options, "f").firstTrackIndex);
             this.addValueObserver(track.arm(), () => {
                 const isArmed = track.arm().get();
                 this.controller.setLight({ row: __classPrivateFieldGet(this, _TracksRow_options, "f").row, column: __classPrivateFieldGet(this, _TracksRow_options, "f").column + trackIndex, color: isArmed ? "magenta" : "off" });
@@ -301,7 +301,7 @@ class TracksRow extends ControllerModule {
         const baseButton = this.controller.coordinateToControlSplitButton({ row: __classPrivateFieldGet(this, _TracksRow_options, "f").row, column: __classPrivateFieldGet(this, _TracksRow_options, "f").column });
         for (let trackIndex = 0; trackIndex < __classPrivateFieldGet(this, _TracksRow_options, "f").numberOfTracks; trackIndex++) {
             if (midi.type === NOTE_ON && midi.data1 === baseButton + trackIndex) {
-                this.bitwig.armTrack(trackIndex);
+                this.bitwig.armTrack(trackIndex + __classPrivateFieldGet(this, _TracksRow_options, "f").firstTrackIndex);
                 return true;
             }
         }
@@ -319,7 +319,8 @@ class ClipArray extends ControllerModule {
     init() {
         // Start observers
         for (let trackIndex = 0; trackIndex < __classPrivateFieldGet(this, _ClipArray_options, "f").numberOfTracks; trackIndex++) {
-            const track = this.bitwig.tracks.getItemAt(trackIndex);
+            const track = this.bitwig.tracks.getItemAt(trackIndex + __classPrivateFieldGet(this, _ClipArray_options, "f").firstTrackIndex);
+            track.arm().markInterested();
             for (let clipIndex = 0; clipIndex < __classPrivateFieldGet(this, _ClipArray_options, "f").clipsPerTrack; clipIndex++) {
                 const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
                 this.addValueObserver(clip.isPlaying(), () => {
@@ -344,9 +345,14 @@ class ClipArray extends ControllerModule {
             if (midi.type === NOTE_ON) {
                 const trackIndex = column - __classPrivateFieldGet(this, _ClipArray_options, "f").column;
                 const clipIndex = row - __classPrivateFieldGet(this, _ClipArray_options, "f").row;
-                const track = this.bitwig.tracks.getItemAt(trackIndex);
+                const track = this.bitwig.tracks.getItemAt(trackIndex + __classPrivateFieldGet(this, _ClipArray_options, "f").firstTrackIndex);
                 const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
+                const bitwig = this.bitwig;
+                const firstTrackIndex = __classPrivateFieldGet(this, _ClipArray_options, "f").firstTrackIndex;
                 function onTap() {
+                    if (!clip.hasContent().getAsBoolean() && !track.arm().get()) {
+                        bitwig.armTrack(trackIndex + firstTrackIndex);
+                    }
                     if (clip.isPlaying().getAsBoolean()) {
                         track.stop();
                     }
@@ -370,19 +376,19 @@ class ClipArray extends ControllerModule {
 _ClipArray_options = new WeakMap(), _ClipArray_instances = new WeakSet(), _ClipArray_updateClipLight = function _ClipArray_updateClipLight(trackIndex, track, clipIndex) {
     const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
     if (clip.isRecording().getAsBoolean()) {
-        this.controller.setLight({ row: clipIndex + 1, column: trackIndex, color: "red" });
+        this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: "red" });
         return;
     }
     if (clip.isPlaying().getAsBoolean()) {
-        this.controller.setLight({ row: clipIndex + 1, column: trackIndex, color: "blue" });
+        this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: "blue" });
         return;
     }
     if (clip.hasContent().getAsBoolean()) {
-        this.controller.setLight({ row: clipIndex + 1, column: trackIndex, color: "white" });
+        this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: "white" });
         return;
     }
     // Clip is empty
-    this.controller.setLight({ row: clipIndex + 1, column: trackIndex, color: "off" });
+    this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: "off" });
 };
 class LoopLength extends ControllerModule {
     constructor(context, options) {
@@ -769,13 +775,14 @@ function init() {
         controller: controller
     };
     const modules = [
-        new TracksRow(context, { row: 0, column: 0, numberOfTracks: 5 }),
-        new ClipArray(context, { row: 1, column: 0, numberOfTracks: 5, clipsPerTrack: 4 }),
+        new TracksRow(context, { row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5 }),
+        new ClipArray(context, { row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4 }),
         new LoopLength(context, { row: 6, column: 0 }),
         new UndoRedo(context, { row: 7, column: 3 }),
         new OverdubToggle(context, { row: 7, column: 0 }),
         new InterfaceToggle(context, { rowWhileEnabled: 7, columnWhileEnabled: 4, rowWhileDisabled: 7, columnWhileDisabled: 0 }),
         new Metronome(context, { row: 7, column: 1 }),
+        new ClipArray(context, { row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1 })
     ];
     controller.addModules(modules);
     controller.start();
