@@ -785,6 +785,30 @@ class Metronome extends ControllerModule {
   }
 }
 
+class Debug extends ControllerModule {
+  init(): void {
+  }
+
+  handleMidi(midi: MidiMessage): boolean {
+    let message = ""
+    const Y_CC = 74
+    if(midi.type == NOTE_ON){
+      message +="   NOTE ON "
+    }else if(midi.type == NOTE_OFF){
+      message +="  NOTE OFF "
+    }else if(midi.type == CC && midi.data1 == Y_CC){
+      message +="      Y CC "
+    }else if(midi.type == CC){
+      message +="        CC "
+    }else{
+      message +="           "
+    }
+    message += `CH ${midi.channel} TY ${midi.type} D1 ${midi.data1} D2 ${midi.data2}`
+    println(message)
+    return false
+  }
+}
+
 interface ControllerOptions {
   expandedControlAreaWidth: number
 }
@@ -1021,6 +1045,7 @@ function init() {
   }
 
   const modules: ControllerModule[] = [
+    new Debug(context),
     new TracksRow(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5}),
     new ClipArray(context, {row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4}),
     new LoopLength(context, {row: 6, column: 0}),
