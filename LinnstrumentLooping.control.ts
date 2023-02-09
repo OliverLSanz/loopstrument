@@ -810,7 +810,15 @@ class Debug extends ControllerModule {
 }
 
 interface ControllerOptions {
-  expandedControlAreaWidth: number
+  // Legacy. It will be useful to control split width
+  // for the CC sliders feature.
+  expandedControlAreaWidth: number,
+  // Number of notes in the split where the control
+  // interface is located.
+  splitRowLength: number,
+  // The number of columns at the left of the split that
+  // should be reserved for the control interface.
+  interfaceWidth: number,
 }
 
 class LiveLoopingController {
@@ -867,8 +875,9 @@ class LiveLoopingController {
     // Global settings
     this.#linn.setRowOffset(0)
     this.#linn.setTransposition(3, 1)
-    this.#linn.setSplitActive(true)
-    this.#linn.setSplitPoint(this.#controlAreaWidth+1)
+    this.#linn.setSelectedSplit("right")
+    this.#linn.setSplitActive(false)
+    //this.#linn.setSplitPoint(this.#controlAreaWidth+1)
     
     // Left split
     this.#linn.setMidiBendRange(24, 'left')
@@ -888,15 +897,18 @@ class LiveLoopingController {
   }
 
   coordinateToControlSplitButton({row, column}: {row: number, column: number}): number {
+    const splitRowLength = this.#options.splitRowLength
+
     if(!this.#interfaceEnabled){
       return 999
     }
-    return this.#firstControlAreaButton + (7-row)*this.#controlAreaWidth + column
+    return this.#firstControlAreaButton + (7-row)*splitRowLength + column
   }
 
   controlSplitButtonToCoordinate(button: number): { row: number, column: number } {
-    const row = 7 - Math.floor((button - this.#firstControlAreaButton) / this.#controlAreaWidth)
-    const column = button % this.#controlAreaWidth
+    const splitRowLength = this.#options.splitRowLength
+    const row = 7 - Math.floor((button - this.#firstControlAreaButton) / splitRowLength)
+    const column = button % splitRowLength
     return { row, column } 
   } 
 
@@ -905,10 +917,11 @@ class LiveLoopingController {
 
     // This ensures the same notes are played by the same buttons
     // regardless of the interface state
-    if(this.#interfaceEnabled){
-      const columnDifference = this.#options.expandedControlAreaWidth - this.#collapsedControlAreaWidth
-      interfaceOffset = columnDifference
-    }
+    // LEGACY, this will be useful for the CC sliders feature
+    // if(this.#interfaceEnabled){
+    //   const columnDifference = this.#options.expandedControlAreaWidth - this.#collapsedControlAreaWidth
+    //   interfaceOffset = columnDifference
+    // }
 
     const rowDecrement = this.#getPlayAreaWidth() - this.#rowOffset
 
@@ -951,11 +964,23 @@ class LiveLoopingController {
     this.#modules.some(module => module.handleMidi({type, channel, data1, data2}))
   }
 
+  private isInterfaceButton(buttonIndex: number){
+    const interfaceWidth = this.#options.interfaceWidth
+    const splitRowLength = this.#options.splitRowLength
+    if(this.#interfaceEnabled){
+      return buttonIndex % splitRowLength < interfaceWidth
+    }
+  }
+
   #updateKeyTranslationTable(){
     const newTranslationTable = []
     if(this.#interfaceEnabled){
       for(let key = 0; key <= MAX_MIDI_NOTE; key++){
-        newTranslationTable.push(this.#buttonToNote(key))
+        if(this.isInterfaceButton(key)){
+          newTranslationTable.push(-1)
+        }else{
+          newTranslationTable.push(this.#buttonToNote(key))
+        }
       }
     }else{
       for(let key = 0; key <= MAX_MIDI_NOTE; key++){
@@ -987,13 +1012,6 @@ class LiveLoopingController {
     }
 
     this.#updateKeyTranslationTable()
-
-    if(this.#interfaceEnabled){
-      this.#linn.setSplitActive(true)
-    }else{
-      this.#linn.setSelectedSplit("right")
-      this.#linn.setSplitActive(false)
-    }
 
     if(this.#interfaceEnabled){
       this.#linn.turnOffLights()
@@ -1035,7 +1053,13 @@ function init() {
   const bitwig = new Bitwig(host)
   const linn = new LinnStrument(bitwig)
 
-  const controller = new LiveLoopingController(bitwig, pressHandler, linn, {expandedControlAreaWidth: 5})
+  const controllerOptions: ControllerOptions = {
+    expandedControlAreaWidth: 5,
+    interfaceWidth: 5,
+    splitRowLength: 16
+  }
+
+  const controller = new LiveLoopingController(bitwig, pressHandler, linn, controllerOptions)
 
   const context: ModuleContext = {
     bitwig: bitwig,
