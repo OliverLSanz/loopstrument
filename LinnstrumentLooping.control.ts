@@ -245,6 +245,27 @@ class LinnStrument {
     this.sendNRPN(201, split == "left" ? 0 : 1)
   }
 
+  setSplitMode(split: Split, mode: "default" | "arpeg" | "faders" | "strum" | "sequencer"){
+    const values = {
+      "default": 0,
+      "arpeg": 1,
+      "faders": 2,
+      "strum": 3,
+      "sequencer": 4
+    }
+
+    this.sendNRPN(split == "left" ? 35 : 135, values[mode])
+  }
+
+  /**
+   * 
+   * @param fader Index of the CC fader, from 0 to 7.
+   * @param ccNumber CC number that the fader should send when used.
+   */
+  setCCFaderNumber(fader: number, ccNumber: number, split: Split){
+    this.sendNRPN((split == 'left'? 40 : 140) + fader, ccNumber)
+  }
+
   // Below this line: unused and not tested
   setPitchQuantize(enabled: boolean, split: Split){
     this.sendNRPN(split == "left"? 21 : 121, enabled ? 1 : 0)
@@ -259,6 +280,15 @@ class LinnStrument {
 
   setSendX(enabled: boolean, split: Split){
     this.sendNRPN(split == "left"? 20 : 120, enabled ? 1 : 0)
+  }
+
+  /**
+   * 
+   * @param fader Index of the CC fader, from 0 to 7.
+   * @param value
+   */
+  setCCFaderValue(fader: number, value: number){
+    this.#bitwig.midiOut({ type: CC, channel: 0, data1: 1 + fader, data2: value })
   }
 }
 
@@ -715,7 +745,7 @@ class InterfaceToggle extends ControllerModule {
       if(this.controller.isInterfaceEnabled()){
         this.controller.setLight({row: this.#options.rowWhileEnabled as row, column: this.#options.columnWhileEnabled as column, color: 'yellow'})
       }else{
-        this.controller.setLight({row: this.#options.rowWhileDisabled as row, column: this.#options.columnWhileDisabled as column, color: 'yellow'}, true)
+        this.controller.setLight({row: this.#options.rowWhileDisabled as row, column: this.#options.columnWhileDisabled as column, color: 'yellow', force: true})
       }
     })
   }
@@ -736,6 +766,38 @@ class InterfaceToggle extends ControllerModule {
       return true
     }
 
+    return false
+  }
+}
+
+interface CCFadersToggleOptions {
+  row: number,
+  column: number,
+  ccFadersWidth: number,
+  lowerCC: 1,
+}
+
+class CCFadersToggle extends ControllerModule {
+  #options: CCFadersToggleOptions
+
+  constructor(context: ModuleContext, options: CCFadersToggleOptions){
+    super(context)
+    this.#options = options
+  }
+
+  init(): void {
+    this.addInitCallback(() => {
+      this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: 'green'})
+    })
+  }
+
+  handleMidi(midi: MidiMessage): boolean {
+    const button = this.controller.coordinateToControlSplitButton({row: this.#options.row, column: this.#options.column})
+
+    if (midi.type === NOTE_ON && midi.data1 === button) {
+      this.controller.toggleCCSliders()
+      return true
+    }
     return false
   }
 }
@@ -810,12 +872,8 @@ class Debug extends ControllerModule {
 }
 
 interface ControllerOptions {
-  // Legacy. It will be useful to control split width
-  // for the CC sliders feature.
-  expandedControlAreaWidth: number,
-  // Number of notes in the split where the control
-  // interface is located.
-  splitRowLength: number,
+  // Width of the CC sliders left split
+  ccSlidersWidth: number,
   // The number of columns at the left of the split that
   // should be reserved for the control interface.
   interfaceWidth: number,
@@ -827,17 +885,16 @@ class LiveLoopingController {
   #keyTranslationTable: number[]
   #noteInput: API.NoteInput
   #interfaceEnabled: boolean
+  ccSlidersEnabled: boolean = false
   #linn: LinnStrument
   linn: LinnStrument
   #modules: ControllerModule[]
-  #controlAreaWidth: number
 
   #options: ControllerOptions
 
   #width = 16
   #height = 8
   #noteOffset = 30  // note played by the lowest key in the play area
-  #collapsedControlAreaWidth = 0
   #rowOffset = 5  // distance in semitomes while going 1 row up
   #noteColors: lightColor[] = ['orange', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off']
   #firstControlAreaButton = 0
@@ -851,10 +908,23 @@ class LiveLoopingController {
     this.#modules = []
     this.#interfaceEnabled = true
     this.#keyTranslationTable = []
-    this.#controlAreaWidth = this.#options.expandedControlAreaWidth
 
     this.#noteInput = this.bitwig.host.getMidiInPort(0).createNoteInput("LinnStrument", "?1????", "?2????", "?3????", "?4????", "?5????", "?6????", "?7????", "?8????", "?9????", "?A????", "?B????", "?C????", "?D????", "?E????", "?F????")
     this.#noteInput.setUseExpressiveMidi(true, 0, 24);
+
+    // Configure CC sliders to control remote control page of selected device
+    const cursorTrack = host.createCursorTrack("LINNSTRUMENT_CURSOR_TRACK", "Cursor Track", 0, 0, true);
+    const cursorDevice = cursorTrack.createCursorDevice();
+    const remoteControlsPage = cursorDevice.createCursorRemoteControlsPage(8)
+    const hardwareSurface = bitwig.host.createHardwareSurface()
+    for (let i = 0; i < remoteControlsPage.getParameterCount(); i++){
+      remoteControlsPage.getParameter(i).setIndication(true);
+      const knob = hardwareSurface.createAbsoluteHardwareKnob("knob"+i)
+      const absoluteCCValueMatcher = this.bitwig.host.getMidiInPort(0).createAbsoluteCCValueMatcher(0,8-i);
+      knob.setAdjustValueMatcher(absoluteCCValueMatcher)
+      knob.disableTakeOver()
+      remoteControlsPage.getParameter(i).addBinding(knob)
+    }
   }
 
   addModules(modules: ControllerModule[]): void {
@@ -876,52 +946,52 @@ class LiveLoopingController {
     this.#linn.setRowOffset(0)
     this.#linn.setTransposition(3, 1)
     this.#linn.setSelectedSplit("right")
-    this.#linn.setSplitActive(false)
-    //this.#linn.setSplitPoint(this.#controlAreaWidth+1)
+    this.#linn.setSplitActive(this.ccSlidersEnabled)
+    this.#linn.setSplitPoint(this.#getLeftSplitWidth()+1)
     
     // Left split
     this.#linn.setMidiBendRange(24, 'left')
     this.#linn.setMidiMode("OneChannel", 'left')
     this.#linn.setMidiMainChannel(0, 'left')
+    this.#linn.setSplitMode('left', 'faders')
+    for(let i = 0; i < 8; i++){
+      this.#linn.setCCFaderNumber(i, i+1, 'left')
+    }
     
     // Right split
     this.#linn.setMidiBendRange(24, 'right')
     this.#linn.setMidiMode("ChannelPerNote", 'right')
+    this.#linn.setSplitMode('right', 'default')
     Array(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15).forEach(i => {
       this.#linn.setMidiPerNoteChannel(i, true, 'right')
     })
   }
 
   #getPlayAreaWidth(){
-    return this.#width - this.#controlAreaWidth
+    return this.#width - this.#getLeftSplitWidth()
+  }
+
+  #getLeftSplitWidth(){
+    return this.ccSlidersEnabled? this.#options.ccSlidersWidth : 0
   }
 
   coordinateToControlSplitButton({row, column}: {row: number, column: number}): number {
-    const splitRowLength = this.#options.splitRowLength
-
     if(!this.#interfaceEnabled){
       return 999
     }
-    return this.#firstControlAreaButton + (7-row)*splitRowLength + column
+    return this.#firstControlAreaButton + (7-row)*this.#getPlayAreaWidth() + column
   }
 
   controlSplitButtonToCoordinate(button: number): { row: number, column: number } {
-    const splitRowLength = this.#options.splitRowLength
-    const row = 7 - Math.floor((button - this.#firstControlAreaButton) / splitRowLength)
-    const column = button % splitRowLength
+    const row = 7 - Math.floor((button - this.#firstControlAreaButton) / this.#getPlayAreaWidth())
+    const column = button % this.#getPlayAreaWidth()
     return { row, column } 
   } 
 
   #buttonToNote(buttonIndex: number): number{
-    let interfaceOffset = 0
-
     // This ensures the same notes are played by the same buttons
     // regardless of the interface state
-    // LEGACY, this will be useful for the CC sliders feature
-    // if(this.#interfaceEnabled){
-    //   const columnDifference = this.#options.expandedControlAreaWidth - this.#collapsedControlAreaWidth
-    //   interfaceOffset = columnDifference
-    // }
+    const interfaceOffset = this.#getLeftSplitWidth()
 
     const rowDecrement = this.#getPlayAreaWidth() - this.#rowOffset
 
@@ -935,14 +1005,13 @@ class LiveLoopingController {
   #setPlayAreaLights(){
     for(let row = 0; row < this.#height; row++){
       for(let column = 0; column < this.#width; column++){
-        const playAreaColumn = column - this.#controlAreaWidth
-        if(playAreaColumn >= 0){
-          const playAreaButton = row * this.#getPlayAreaWidth() + playAreaColumn
+        if(column >= 0){
+          const playAreaButton = row * this.#getPlayAreaWidth() + column
           const note = this.#buttonToNote(playAreaButton) % 12
           const color = this.#noteColors[note]
-          this.setLight({row: 7-row as row, column: column as column, color}, true)
+          this.setLight({row: 7-row as row, column: column as column, color, force: true})
         }else{
-          this.setLight({row: 7-row as row, column: column as column, color: "off"}, true)
+          this.setLight({row: 7-row as row, column: column as column, color: "off", force: true})
         }
       }
     }
@@ -953,7 +1022,7 @@ class LiveLoopingController {
     const buttonsPerRow = 16
     const row = Math.floor((button - buttonOffset)/buttonsPerRow)
     const column = button - row*buttonsPerRow
-    this.setLight({row: 7 - row as row, column: column as column, color}, force)
+    this.setLight({row: 7 - row as row, column: column as column, color, force})
   }
 
   handleMidi(status: number, data1: number, data2: number){
@@ -966,9 +1035,8 @@ class LiveLoopingController {
 
   private isInterfaceButton(buttonIndex: number){
     const interfaceWidth = this.#options.interfaceWidth
-    const splitRowLength = this.#options.splitRowLength
     if(this.#interfaceEnabled){
-      return buttonIndex % splitRowLength < interfaceWidth
+      return buttonIndex % this.#getPlayAreaWidth() < interfaceWidth
     }
   }
 
@@ -1000,17 +1068,18 @@ class LiveLoopingController {
     this.#update()
   }
 
+  toggleCCSliders(){
+    this.ccSlidersEnabled = !this.ccSlidersEnabled
+    this.#linn.setSplitActive(this.ccSlidersEnabled)
+    this.#linn.setSplitPoint(this.#getLeftSplitWidth()+1)
+    this.#update()
+  }
+
   isInterfaceEnabled(){
     return this.#interfaceEnabled
   }
 
   #update(){
-    if(this.#interfaceEnabled){
-      this.#controlAreaWidth = this.#options.expandedControlAreaWidth
-    }else{
-      this.#controlAreaWidth = this.#collapsedControlAreaWidth
-    }
-
     this.#updateKeyTranslationTable()
 
     if(this.#interfaceEnabled){
@@ -1021,11 +1090,44 @@ class LiveLoopingController {
 
     this.#setPlayAreaLights()
     this.#modules.forEach(module => module.update())
+
+    // Color the CC sliders matching bitwig remote control page
+    // knob colors.
+    if(this.ccSlidersEnabled){
+      this.#linn.setLight({row: 0, column: 0, color: "red"})
+      this.#linn.setLight({row: 0, column: 1, color: "red"})
+      this.#linn.setLight({row: 1, column: 0, color: "orange"})
+      this.#linn.setLight({row: 1, column: 1, color: "orange"})
+      this.#linn.setLight({row: 2, column: 0, color: "yellow"})
+      this.#linn.setLight({row: 2, column: 1, color: "yellow"})
+      this.#linn.setLight({row: 3, column: 0, color: "green"})
+      this.#linn.setLight({row: 3, column: 1, color: "green"})
+      this.#linn.setLight({row: 4, column: 0, color: "lime"})
+      this.#linn.setLight({row: 4, column: 1, color: "lime"})
+      this.#linn.setLight({row: 5, column: 0, color: "cyan"})
+      this.#linn.setLight({row: 5, column: 1, color: "cyan"})
+      this.#linn.setLight({row: 6, column: 0, color: "pink"})
+      this.#linn.setLight({row: 6, column: 1, color: "pink"})
+      this.#linn.setLight({row: 7, column: 0, color: "magenta"})
+      this.#linn.setLight({row: 7, column: 1, color: "magenta"})
+    }
   }
 
-  setLight(options: {row: row, column: column, color: lightColor}, force: boolean = false){
-    if(this.#interfaceEnabled || force){
-      this.#linn.setLight(options)
+  setLight(options: {
+    row: row, column: column, color: lightColor, 
+    // whether to set the color even if the interface is disabled
+    force?: boolean, 
+    // whether to add offset caused by the left split to the coordinates
+    absolute?: boolean 
+  }){
+    const linnOptions = { 
+      row: options.row, 
+      column: options.column + (options.absolute ? 0 : this.#getLeftSplitWidth()), 
+      color: options.color 
+    }
+
+    if(this.#interfaceEnabled || options.force){
+      this.#linn.setLight(linnOptions)
     }
   }
 }
@@ -1054,9 +1156,8 @@ function init() {
   const linn = new LinnStrument(bitwig)
 
   const controllerOptions: ControllerOptions = {
-    expandedControlAreaWidth: 5,
+    ccSlidersWidth: 2,
     interfaceWidth: 5,
-    splitRowLength: 16
   }
 
   const controller = new LiveLoopingController(bitwig, pressHandler, linn, controllerOptions)
@@ -1073,9 +1174,10 @@ function init() {
     new TracksRow(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5}),
     new ClipArray(context, {row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4}),
     new LoopLength(context, {row: 6, column: 0}),
-    new UndoRedo(context, {row: 7, column: 3}),
+    new UndoRedo(context, {row: 7, column: 2}),
     new OverdubToggle(context, {row: 7, column: 0}),
     new InterfaceToggle(context, { rowWhileEnabled: 7, columnWhileEnabled: 4, rowWhileDisabled: 7, columnWhileDisabled: 0 }),
+    new CCFadersToggle(context, { row: 7, column: 3, ccFadersWidth: 2, lowerCC: 1 }),
     new Metronome(context, {row: 7, column: 1}),
     new ClipArray(context, {row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1})
   ]
