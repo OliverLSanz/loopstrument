@@ -12,7 +12,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ControllerModule_onUpdate, _TracksRow_options, _ClipArray_instances, _ClipArray_options, _ClipArray_updateClipLight, _LoopLength_options, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _UndoRedo_options, _OverdubToggle_options, _InterfaceToggle_options, _CCFadersToggle_options, _Metronome_instances, _Metronome_options, _Metronome_onTap, _Metronome_onLongPress, _LiveLoopingController_instances, _LiveLoopingController_keyTranslationTable, _LiveLoopingController_noteInput, _LiveLoopingController_interfaceEnabled, _LiveLoopingController_linn, _LiveLoopingController_modules, _LiveLoopingController_options, _LiveLoopingController_width, _LiveLoopingController_height, _LiveLoopingController_noteOffset, _LiveLoopingController_rowOffset, _LiveLoopingController_noteColors, _LiveLoopingController_firstControlAreaButton, _LiveLoopingController_configureLinnstrument, _LiveLoopingController_getPlayAreaWidth, _LiveLoopingController_getLeftSplitWidth, _LiveLoopingController_buttonToNote, _LiveLoopingController_setPlayAreaLights, _LiveLoopingController_updateKeyTranslationTable, _LiveLoopingController_update;
+var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ControllerModule_onUpdate, _TracksRow_options, _ClipArray_instances, _ClipArray_options, _ClipArray_updateClipLight, _LoopLength_options, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _UndoRedo_options, _OverdubToggle_options, _InterfaceToggle_options, _CCFadersToggle_instances, _CCFadersToggle_options, _CCFadersToggle_onTap, _CCFadersToggle_onLongPress, _Metronome_instances, _Metronome_options, _Metronome_onTap, _Metronome_onLongPress, _LiveLoopingController_instances, _LiveLoopingController_keyTranslationTable, _LiveLoopingController_noteInput, _LiveLoopingController_interfaceEnabled, _LiveLoopingController_linn, _LiveLoopingController_modules, _LiveLoopingController_options, _LiveLoopingController_width, _LiveLoopingController_height, _LiveLoopingController_noteOffset, _LiveLoopingController_rowOffset, _LiveLoopingController_noteColors, _LiveLoopingController_firstControlAreaButton, _LiveLoopingController_configureLinnstrument, _LiveLoopingController_getPlayAreaWidth, _LiveLoopingController_getLeftSplitWidth, _LiveLoopingController_buttonToNote, _LiveLoopingController_setPlayAreaLights, _LiveLoopingController_updateKeyTranslationTable, _LiveLoopingController_update;
 const lightColorValues = {
     default: 0,
     red: 1,
@@ -581,6 +581,7 @@ _InterfaceToggle_options = new WeakMap();
 class CCFadersToggle extends ControllerModule {
     constructor(context, options) {
         super(context);
+        _CCFadersToggle_instances.add(this);
         _CCFadersToggle_options.set(this, void 0);
         __classPrivateFieldSet(this, _CCFadersToggle_options, options, "f");
     }
@@ -592,13 +593,21 @@ class CCFadersToggle extends ControllerModule {
     handleMidi(midi) {
         const button = this.controller.coordinateToControlSplitButton({ row: __classPrivateFieldGet(this, _CCFadersToggle_options, "f").row, column: __classPrivateFieldGet(this, _CCFadersToggle_options, "f").column });
         if (midi.type === NOTE_ON && midi.data1 === button) {
-            this.controller.toggleCCSliders();
+            this.pressHandler.handlePressBegin(() => __classPrivateFieldGet(this, _CCFadersToggle_instances, "m", _CCFadersToggle_onTap).call(this), () => __classPrivateFieldGet(this, _CCFadersToggle_instances, "m", _CCFadersToggle_onLongPress).call(this), 500, midi.data1);
+            return true;
+        }
+        if (midi.type === NOTE_OFF && midi.data1 === button) {
+            this.pressHandler.handlePressEnd(midi.data1);
             return true;
         }
         return false;
     }
 }
-_CCFadersToggle_options = new WeakMap();
+_CCFadersToggle_options = new WeakMap(), _CCFadersToggle_instances = new WeakSet(), _CCFadersToggle_onTap = function _CCFadersToggle_onTap() {
+    this.controller.toggleCCSliders();
+}, _CCFadersToggle_onLongPress = function _CCFadersToggle_onLongPress() {
+    this.controller.setSlidersMode(this.controller.slidersMode == 'hard' ? 'soft' : 'hard');
+};
 class Metronome extends ControllerModule {
     constructor(context, options) {
         super(context);
@@ -663,6 +672,7 @@ class LiveLoopingController {
         _LiveLoopingController_noteInput.set(this, void 0);
         _LiveLoopingController_interfaceEnabled.set(this, void 0);
         this.ccSlidersEnabled = false;
+        this.slidersMode = "soft";
         _LiveLoopingController_linn.set(this, void 0);
         _LiveLoopingController_modules.set(this, void 0);
         _LiveLoopingController_options.set(this, void 0);
@@ -750,6 +760,13 @@ class LiveLoopingController {
     }
     isInterfaceEnabled() {
         return __classPrivateFieldGet(this, _LiveLoopingController_interfaceEnabled, "f");
+    }
+    setSlidersMode(mode) {
+        this.slidersMode = mode;
+        for (let i = 0; i < 8; i++) {
+            __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setCCFaderNumber(i, (mode == "soft" ? 0 : 8) + i + 1, 'left');
+        }
+        __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_update).call(this);
     }
     setLight(options) {
         const linnOptions = {
@@ -848,22 +865,16 @@ _LiveLoopingController_keyTranslationTable = new WeakMap(), _LiveLoopingControll
     // Color the CC sliders matching bitwig remote control page
     // knob colors.
     if (this.ccSlidersEnabled) {
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 0, column: 0, color: "red" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 0, column: 1, color: "red" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 1, column: 0, color: "orange" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 1, column: 1, color: "orange" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 2, column: 0, color: "yellow" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 2, column: 1, color: "yellow" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 3, column: 0, color: "green" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 3, column: 1, color: "green" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 4, column: 0, color: "lime" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 4, column: 1, color: "lime" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 5, column: 0, color: "cyan" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 5, column: 1, color: "cyan" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 6, column: 0, color: "pink" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 6, column: 1, color: "pink" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 7, column: 0, color: "magenta" });
-        __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: 7, column: 1, color: "magenta" });
+        const softColors = ['red', 'orange', 'yellow', 'green', 'lime', 'cyan', 'pink', 'magenta'];
+        const hardColors = ['white', 'cyan', 'white', 'cyan', 'white', 'cyan', 'white', 'cyan'];
+        const sliderColors = {
+            'soft': softColors,
+            'hard': hardColors
+        };
+        for (let i = 0; i < 8; i++) {
+            __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: i, column: 0, color: sliderColors[this.slidersMode][i] });
+            __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight({ row: i, column: 1, color: sliderColors[this.slidersMode][i] });
+        }
     }
 };
 //  _______  _______  ______    ___   _______  _______

@@ -793,12 +793,23 @@ class CCFadersToggle extends ControllerModule {
 
   handleMidi(midi: MidiMessage): boolean {
     const button = this.controller.coordinateToControlSplitButton({row: this.#options.row, column: this.#options.column})
-
     if (midi.type === NOTE_ON && midi.data1 === button) {
-      this.controller.toggleCCSliders()
+      this.pressHandler.handlePressBegin(() => this.#onTap(), () => this.#onLongPress(), 500, midi.data1)
+      return true
+    }
+    if(midi.type === NOTE_OFF && midi.data1 === button){
+      this.pressHandler.handlePressEnd(midi.data1)
       return true
     }
     return false
+  }
+
+  #onTap(){
+    this.controller.toggleCCSliders()
+  }
+
+  #onLongPress(){
+    this.controller.setSlidersMode(this.controller.slidersMode == 'hard' ? 'soft' : 'hard')
   }
 }
 
@@ -886,6 +897,7 @@ class LiveLoopingController {
   #noteInput: API.NoteInput
   #interfaceEnabled: boolean
   ccSlidersEnabled: boolean = false
+  slidersMode: "soft" | "hard" = "soft"
   #linn: LinnStrument
   linn: LinnStrument
   #modules: ControllerModule[]
@@ -1094,23 +1106,26 @@ class LiveLoopingController {
     // Color the CC sliders matching bitwig remote control page
     // knob colors.
     if(this.ccSlidersEnabled){
-      this.#linn.setLight({row: 0, column: 0, color: "red"})
-      this.#linn.setLight({row: 0, column: 1, color: "red"})
-      this.#linn.setLight({row: 1, column: 0, color: "orange"})
-      this.#linn.setLight({row: 1, column: 1, color: "orange"})
-      this.#linn.setLight({row: 2, column: 0, color: "yellow"})
-      this.#linn.setLight({row: 2, column: 1, color: "yellow"})
-      this.#linn.setLight({row: 3, column: 0, color: "green"})
-      this.#linn.setLight({row: 3, column: 1, color: "green"})
-      this.#linn.setLight({row: 4, column: 0, color: "lime"})
-      this.#linn.setLight({row: 4, column: 1, color: "lime"})
-      this.#linn.setLight({row: 5, column: 0, color: "cyan"})
-      this.#linn.setLight({row: 5, column: 1, color: "cyan"})
-      this.#linn.setLight({row: 6, column: 0, color: "pink"})
-      this.#linn.setLight({row: 6, column: 1, color: "pink"})
-      this.#linn.setLight({row: 7, column: 0, color: "magenta"})
-      this.#linn.setLight({row: 7, column: 1, color: "magenta"})
+      const softColors: lightColor[] = ['red', 'orange', 'yellow', 'green', 'lime', 'cyan', 'pink', 'magenta']
+      const hardColors: lightColor[] = ['white', 'cyan', 'white', 'cyan', 'white', 'cyan', 'white', 'cyan']
+      const sliderColors = {
+        'soft': softColors,
+        'hard': hardColors
+      }
+
+      for(let i = 0; i < 8; i++){
+        this.#linn.setLight({row: i as row, column: 0, color: sliderColors[this.slidersMode][i]})
+        this.#linn.setLight({row: i as row, column: 1, color: sliderColors[this.slidersMode][i]})
+      }
     }
+  }
+
+  setSlidersMode(mode: 'soft' | 'hard'){
+    this.slidersMode = mode
+    for(let i = 0; i < 8; i++){
+      this.#linn.setCCFaderNumber(i, (mode=="soft"?0:8)+i+1, 'left')
+    }
+    this.#update()
   }
 
   setLight(options: {
