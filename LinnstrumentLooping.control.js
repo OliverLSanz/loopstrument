@@ -332,7 +332,11 @@ class TracksRow extends ControllerModule {
             const track = this.bitwig.tracks.getItemAt(trackIndex + __classPrivateFieldGet(this, _TracksRow_options, "f").firstTrackIndex);
             this.addValueObserver(track.arm(), () => {
                 const isArmed = track.arm().get();
-                this.controller.setLight({ row: __classPrivateFieldGet(this, _TracksRow_options, "f").row, column: __classPrivateFieldGet(this, _TracksRow_options, "f").column + trackIndex, color: isArmed ? "magenta" : "off" });
+                this.controller.setLight({
+                    row: __classPrivateFieldGet(this, _TracksRow_options, "f").row,
+                    column: __classPrivateFieldGet(this, _TracksRow_options, "f").column + trackIndex,
+                    color: isArmed ? __classPrivateFieldGet(this, _TracksRow_options, "f").armedTrackColor : __classPrivateFieldGet(this, _TracksRow_options, "f").unarmedTrackColor
+                });
             });
         }
     }
@@ -440,19 +444,19 @@ class FollowerClipColumn extends ClipControllerModule {
             return;
         }
         if (clip.isRecording().getAsBoolean()) {
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").column, color: "red" });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").column, color: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").recordingColor });
             return;
         }
         if (clip.isPlaying().getAsBoolean()) {
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").column, color: "blue" });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").column, color: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").playingColor });
             return;
         }
         if (clip.hasContent().getAsBoolean()) {
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").column, color: "white" });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").column, color: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").pausedColor });
             return;
         }
         // Clip is empty
-        this.controller.setLight({ row: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").column, color: "off" });
+        this.controller.setLight({ row: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").column, color: __classPrivateFieldGet(this, _FollowerClipColumn_options, "f").emptyColor });
     }
 }
 _FollowerClipColumn_options = new WeakMap(), _FollowerClipColumn_currentTrackIndex = new WeakMap();
@@ -486,19 +490,19 @@ class ClipArray extends ClipControllerModule {
     updateClipLight(trackIndex, track, clipIndex) {
         const clip = track.clipLauncherSlotBank().getItemAt(clipIndex);
         if (clip.isRecording().getAsBoolean()) {
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: "red" });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: __classPrivateFieldGet(this, _ClipArray_options, "f").recordingColor });
             return;
         }
         if (clip.isPlaying().getAsBoolean()) {
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: "blue" });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: __classPrivateFieldGet(this, _ClipArray_options, "f").playingColor });
             return;
         }
         if (clip.hasContent().getAsBoolean()) {
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: "white" });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: __classPrivateFieldGet(this, _ClipArray_options, "f").pausedColor });
             return;
         }
         // Clip is empty
-        this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: "off" });
+        this.controller.setLight({ row: __classPrivateFieldGet(this, _ClipArray_options, "f").row + clipIndex, column: __classPrivateFieldGet(this, _ClipArray_options, "f").column + trackIndex, color: __classPrivateFieldGet(this, _ClipArray_options, "f").emptyColor });
     }
 }
 _ClipArray_options = new WeakMap();
@@ -542,11 +546,11 @@ class LoopLength extends ControllerModule {
         const light3 = (numberOfBars >> 2) % 2;
         const light4 = (numberOfBars >> 3) % 2;
         const light5 = (numberOfBars >> 4) % 2;
-        this.controller.setLight({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column, color: light1 ? "blue" : "off" });
-        this.controller.setLight({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column + 1, color: light2 ? "blue" : "off" });
-        this.controller.setLight({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column + 2, color: light3 ? "blue" : "off" });
-        this.controller.setLight({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column + 3, color: light4 ? "blue" : "off" });
-        this.controller.setLight({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column + 4, color: light5 ? "blue" : "off" });
+        this.controller.setLight({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column, color: light1 ? __classPrivateFieldGet(this, _LoopLength_options, "f").onColor : __classPrivateFieldGet(this, _LoopLength_options, "f").offColor });
+        this.controller.setLight({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column + 1, color: light2 ? __classPrivateFieldGet(this, _LoopLength_options, "f").onColor : __classPrivateFieldGet(this, _LoopLength_options, "f").offColor });
+        this.controller.setLight({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column + 2, color: light3 ? __classPrivateFieldGet(this, _LoopLength_options, "f").onColor : __classPrivateFieldGet(this, _LoopLength_options, "f").offColor });
+        this.controller.setLight({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column + 3, color: light4 ? __classPrivateFieldGet(this, _LoopLength_options, "f").onColor : __classPrivateFieldGet(this, _LoopLength_options, "f").offColor });
+        this.controller.setLight({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column + 4, color: light5 ? __classPrivateFieldGet(this, _LoopLength_options, "f").onColor : __classPrivateFieldGet(this, _LoopLength_options, "f").offColor });
     }
     handleMidi(midi) {
         const baseNote = this.controller.coordinateToControlSplitButton({ row: __classPrivateFieldGet(this, _LoopLength_options, "f").row, column: __classPrivateFieldGet(this, _LoopLength_options, "f").column });
@@ -588,7 +592,7 @@ class UndoRedo extends ControllerModule {
     }
     init() {
         this.addInitCallback(() => {
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _UndoRedo_options, "f").row, column: __classPrivateFieldGet(this, _UndoRedo_options, "f").column, color: "magenta" });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _UndoRedo_options, "f").row, column: __classPrivateFieldGet(this, _UndoRedo_options, "f").column, color: __classPrivateFieldGet(this, _UndoRedo_options, "f").color });
         });
     }
     handleMidi(midi) {
@@ -614,7 +618,7 @@ class OverdubToggle extends ControllerModule {
     init() {
         this.addValueObserver(this.bitwig.transport.isClipLauncherOverdubEnabled(), () => {
             const isOverdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().get();
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _OverdubToggle_options, "f").row, column: __classPrivateFieldGet(this, _OverdubToggle_options, "f").column, color: isOverdubEnabled ? "red" : "white" });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _OverdubToggle_options, "f").row, column: __classPrivateFieldGet(this, _OverdubToggle_options, "f").column, color: isOverdubEnabled ? __classPrivateFieldGet(this, _OverdubToggle_options, "f").onColor : __classPrivateFieldGet(this, _OverdubToggle_options, "f").offColor });
         });
     }
     handleMidi(midi) {
@@ -636,7 +640,7 @@ class InterfaceToggle extends ControllerModule {
     }
     init() {
         this.addInitCallback(() => {
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _InterfaceToggle_options, "f").row, column: __classPrivateFieldGet(this, _InterfaceToggle_options, "f").column, color: 'yellow', force: true });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _InterfaceToggle_options, "f").row, column: __classPrivateFieldGet(this, _InterfaceToggle_options, "f").column, color: __classPrivateFieldGet(this, _InterfaceToggle_options, "f").color, force: true });
         });
     }
     handleMidi(midi) {
@@ -663,7 +667,7 @@ class CCFadersToggle extends ControllerModule {
     }
     init() {
         this.addInitCallback(() => {
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _CCFadersToggle_options, "f").row, column: __classPrivateFieldGet(this, _CCFadersToggle_options, "f").column, color: 'green' });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _CCFadersToggle_options, "f").row, column: __classPrivateFieldGet(this, _CCFadersToggle_options, "f").column, color: __classPrivateFieldGet(this, _CCFadersToggle_options, "f").color });
         });
     }
     handleMidi(midi) {
@@ -694,7 +698,7 @@ class Metronome extends ControllerModule {
     init() {
         this.addValueObserver(this.bitwig.transport.isMetronomeEnabled(), () => {
             const metronomeEnabled = this.bitwig.transport.isMetronomeEnabled().get();
-            this.controller.setLight({ row: __classPrivateFieldGet(this, _Metronome_options, "f").row, column: __classPrivateFieldGet(this, _Metronome_options, "f").column, color: metronomeEnabled ? "orange" : "white" });
+            this.controller.setLight({ row: __classPrivateFieldGet(this, _Metronome_options, "f").row, column: __classPrivateFieldGet(this, _Metronome_options, "f").column, color: metronomeEnabled ? __classPrivateFieldGet(this, _Metronome_options, "f").onColor : __classPrivateFieldGet(this, _Metronome_options, "f").offColor });
         });
     }
     handleMidi(midi) {
@@ -977,23 +981,23 @@ function init() {
     };
     const defaultModules = [
         new Debug(context),
-        new TracksRow(context, { row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5 }),
-        new ClipArray(context, { row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4 }),
-        new LoopLength(context, { row: 6, column: 0 }),
-        new UndoRedo(context, { row: 7, column: 2 }),
-        new OverdubToggle(context, { row: 7, column: 0 }),
-        new InterfaceToggle(context, { row: 7, column: 4 }),
-        new CCFadersToggle(context, { row: 7, column: 3, ccFadersWidth: 2, lowerCC: 1 }),
-        new Metronome(context, { row: 7, column: 1 }),
-        new ClipArray(context, { row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1 })
+        new TracksRow(context, { row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, armedTrackColor: "magenta", unarmedTrackColor: "off" }),
+        new ClipArray(context, { row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off" }),
+        new LoopLength(context, { row: 6, column: 0, offColor: 'off', onColor: 'blue' }),
+        new UndoRedo(context, { row: 7, column: 2, color: 'magenta' }),
+        new OverdubToggle(context, { row: 7, column: 0, offColor: 'white', onColor: 'red' }),
+        new InterfaceToggle(context, { row: 7, column: 4, color: "yellow" }),
+        new CCFadersToggle(context, { row: 7, column: 3, ccFadersWidth: 2, lowerCC: 1, color: 'green' }),
+        new Metronome(context, { row: 7, column: 1, onColor: 'orange', offColor: 'white' }),
+        new ClipArray(context, { row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off" })
     ];
     const collapsedInterfaceModules = [
         new Debug(context),
-        new FollowerClipColumn(context, { row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4 }),
-        new OverdubToggle(context, { row: 4, column: 0 }),
-        new UndoRedo(context, { row: 5, column: 0 }),
-        new CCFadersToggle(context, { row: 6, column: 0, ccFadersWidth: 2, lowerCC: 1 }),
-        new InterfaceToggle(context, { row: 7, column: 0 }),
+        new FollowerClipColumn(context, { row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off" }),
+        new OverdubToggle(context, { row: 4, column: 0, offColor: 'white', onColor: 'red' }),
+        new UndoRedo(context, { row: 5, column: 0, color: "magenta" }),
+        new CCFadersToggle(context, { row: 6, column: 0, ccFadersWidth: 2, lowerCC: 1, color: 'green' }),
+        new InterfaceToggle(context, { row: 7, column: 0, color: "yellow" }),
     ];
     controller.addModules("default", defaultModules);
     controller.addModules("collapsedInterface", collapsedInterfaceModules);

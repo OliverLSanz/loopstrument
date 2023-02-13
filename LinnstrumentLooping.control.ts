@@ -436,7 +436,9 @@ interface TracksRowOptions {
   row: number,
   column: number, 
   numberOfTracks: number,
-  firstTrackIndex: number
+  firstTrackIndex: number,
+  armedTrackColor: lightColor,
+  unarmedTrackColor: lightColor,
 }
 
 class TracksRow extends ControllerModule {
@@ -453,7 +455,11 @@ class TracksRow extends ControllerModule {
 
       this.addValueObserver(track.arm(), () => {
         const isArmed = track.arm().get()
-        this.controller.setLight({row: this.#options.row as row, column: this.#options.column + trackIndex as column, color: isArmed ? "magenta" : "off"})
+        this.controller.setLight({
+          row: this.#options.row as row, 
+          column: this.#options.column + trackIndex as column, 
+          color: isArmed ? this.#options.armedTrackColor : this.#options.unarmedTrackColor
+        })
       })
     }
   }
@@ -471,14 +477,6 @@ class TracksRow extends ControllerModule {
 
     return false
   }
-}
-
-interface FollowerClipColumnOptions {
-  row: number,
-  column: number,
-  clipsPerTrack: number,
-  firstTrackIndex: number, 
-  numberOfTracks: number,  // Number of tracks to keep track of
 }
 
 /**
@@ -534,11 +532,23 @@ class ClipControllerModule extends ControllerModule {
   }
 }
 
+interface FollowerClipColumnOptions {
+  row: number,
+  column: number,
+  clipsPerTrack: number,
+  firstTrackIndex: number, 
+  numberOfTracks: number,  // Number of tracks to keep track of
+  recordingColor: lightColor,
+  playingColor: lightColor,
+  pausedColor: lightColor,
+  emptyColor: lightColor,
+}
+
 class FollowerClipColumn extends ClipControllerModule {
   #options: FollowerClipColumnOptions
   #currentTrackIndex: number = 0
 
-  constructor(context: ModuleContext, options: ClipArrayOptions){
+  constructor(context: ModuleContext, options: FollowerClipColumnOptions){
     super(context)
     this.#options = options
   }
@@ -592,19 +602,19 @@ class FollowerClipColumn extends ClipControllerModule {
     }
 
     if (clip.isRecording().getAsBoolean()) {
-      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column as column, color: "red" })
+      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column as column, color: this.#options.recordingColor })
       return
     }
     if (clip.isPlaying().getAsBoolean()) {
-      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column as column, color: "blue" })
+      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column as column, color: this.#options.playingColor })
       return
     }
     if (clip.hasContent().getAsBoolean()) {
-      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column as column, color: "white" })
+      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column as column, color: this.#options.pausedColor })
       return
     }
     // Clip is empty
-    this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column as column, color: "off" })
+    this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column as column, color: this.#options.emptyColor })
   }
 
 }
@@ -615,6 +625,10 @@ interface ClipArrayOptions {
   numberOfTracks: number,
   firstTrackIndex: number,
   clipsPerTrack: number,
+  recordingColor: lightColor,
+  playingColor: lightColor,
+  pausedColor: lightColor,
+  emptyColor: lightColor,
 }
 
 class ClipArray extends ClipControllerModule {
@@ -657,25 +671,27 @@ class ClipArray extends ClipControllerModule {
     const clip = track.clipLauncherSlotBank().getItemAt(clipIndex)
 
     if (clip.isRecording().getAsBoolean()) {
-      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: "red" })
+      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: this.#options.recordingColor })
       return
     }
     if (clip.isPlaying().getAsBoolean()) {
-      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: "blue" })
+      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: this.#options.playingColor })
       return
     }
     if (clip.hasContent().getAsBoolean()) {
-      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: "white" })
+      this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: this.#options.pausedColor })
       return
     }
     // Clip is empty
-    this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: "off" })
+    this.controller.setLight({ row: this.#options.row + clipIndex as row, column: this.#options.column + trackIndex as column, color: this.#options.emptyColor })
   }
 }
 
 interface LoopLengthOptions {
   row: number,
   column: number,
+  onColor: lightColor,
+  offColor: lightColor,
 }
 
 class LoopLength extends ControllerModule {
@@ -724,11 +740,11 @@ class LoopLength extends ControllerModule {
     const light4 = (numberOfBars>>3) % 2
     const light5 = (numberOfBars>>4) % 2
 
-    this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: light1 ? "blue" : "off"})
-    this.controller.setLight({row: this.#options.row as row, column: this.#options.column + 1 as column, color: light2 ? "blue" : "off"})
-    this.controller.setLight({row: this.#options.row as row, column: this.#options.column + 2 as column, color: light3 ? "blue" : "off"})
-    this.controller.setLight({row: this.#options.row as row, column: this.#options.column + 3 as column, color: light4 ? "blue" : "off"})
-    this.controller.setLight({row: this.#options.row as row, column: this.#options.column + 4 as column, color: light5 ? "blue" : "off"})
+    this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: light1 ? this.#options.onColor : this.#options.offColor})
+    this.controller.setLight({row: this.#options.row as row, column: this.#options.column + 1 as column, color: light2 ? this.#options.onColor : this.#options.offColor})
+    this.controller.setLight({row: this.#options.row as row, column: this.#options.column + 2 as column, color: light3 ? this.#options.onColor : this.#options.offColor})
+    this.controller.setLight({row: this.#options.row as row, column: this.#options.column + 3 as column, color: light4 ? this.#options.onColor : this.#options.offColor})
+    this.controller.setLight({row: this.#options.row as row, column: this.#options.column + 4 as column, color: light5 ? this.#options.onColor : this.#options.offColor})
   }
 
   handleMidi(midi: MidiMessage): boolean {
@@ -773,7 +789,8 @@ class LoopLength extends ControllerModule {
 
 interface UndoRedoOptions {
   row: number,
-  column: number
+  column: number,
+  color: lightColor
 }
 
 class UndoRedo extends ControllerModule {
@@ -786,7 +803,7 @@ class UndoRedo extends ControllerModule {
 
   init(): void {
     this.addInitCallback(() => {
-      this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: "magenta"})
+      this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: this.#options.color})
     })
   }
 
@@ -809,7 +826,9 @@ class UndoRedo extends ControllerModule {
 
 interface OverdubToggleOptions {
   row: number,
-  column: number
+  column: number,
+  onColor: lightColor,
+  offColor: lightColor,
 }
 
 class OverdubToggle extends ControllerModule {
@@ -823,7 +842,7 @@ class OverdubToggle extends ControllerModule {
   init(): void {
     this.addValueObserver(this.bitwig.transport.isClipLauncherOverdubEnabled(), () => {
       const isOverdubEnabled = this.bitwig.transport.isClipLauncherOverdubEnabled().get()
-      this.controller.setLight({ row: this.#options.row as row, column: this.#options.column as column, color: isOverdubEnabled ? "red" : "white" })
+      this.controller.setLight({ row: this.#options.row as row, column: this.#options.column as column, color: isOverdubEnabled ? this.#options.onColor : this.#options.offColor })
     })
   }
 
@@ -842,6 +861,7 @@ class OverdubToggle extends ControllerModule {
 interface InterfaceToggleOptions {
   row: number,
   column: number,
+  color: lightColor,
 }
 
 class InterfaceToggle extends ControllerModule {
@@ -854,7 +874,7 @@ class InterfaceToggle extends ControllerModule {
 
   init(): void {
     this.addInitCallback(() => {
-      this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: 'yellow', force: true})
+      this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: this.#options.color, force: true})
     })
   }
 
@@ -878,6 +898,7 @@ interface CCFadersToggleOptions {
   column: number,
   ccFadersWidth: number,
   lowerCC: 1,
+  color: lightColor,
 }
 
 class CCFadersToggle extends ControllerModule {
@@ -890,7 +911,7 @@ class CCFadersToggle extends ControllerModule {
 
   init(): void {
     this.addInitCallback(() => {
-      this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: 'green'})
+      this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: this.#options.color})
     })
   }
 
@@ -918,7 +939,9 @@ class CCFadersToggle extends ControllerModule {
 
 interface MetronomeOptions {
   row: number,
-  column: number
+  column: number,
+  onColor: lightColor,
+  offColor: lightColor,
 }
 
 class Metronome extends ControllerModule {
@@ -932,7 +955,7 @@ class Metronome extends ControllerModule {
   init(): void {
     this.addValueObserver(this.bitwig.transport.isMetronomeEnabled(), () => {
       const metronomeEnabled = this.bitwig.transport.isMetronomeEnabled().get()
-      this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: metronomeEnabled? "orange" : "white"})
+      this.controller.setLight({row: this.#options.row as row, column: this.#options.column as column, color: metronomeEnabled? this.#options.onColor : this.#options.offColor})
     })
   }
 
@@ -1284,24 +1307,24 @@ function init() {
 
   const defaultModules: ControllerModule[] = [
     new Debug(context),
-    new TracksRow(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5}),
-    new ClipArray(context, {row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4}),
-    new LoopLength(context, {row: 6, column: 0}),
-    new UndoRedo(context, {row: 7, column: 2}),
-    new OverdubToggle(context, {row: 7, column: 0}),
-    new InterfaceToggle(context, { row: 7, column: 4 }),
-    new CCFadersToggle(context, { row: 7, column: 3, ccFadersWidth: 2, lowerCC: 1 }),
-    new Metronome(context, {row: 7, column: 1}),
-    new ClipArray(context, {row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1})
+    new TracksRow(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, armedTrackColor: "magenta", unarmedTrackColor: "off"}),
+    new ClipArray(context, {row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off"}),
+    new LoopLength(context, {row: 6, column: 0, offColor: 'off', onColor: 'blue'}),
+    new UndoRedo(context, {row: 7, column: 2, color: 'magenta'}),
+    new OverdubToggle(context, {row: 7, column: 0, offColor: 'white', onColor: 'red'}),
+    new InterfaceToggle(context, {row: 7, column: 4, color: "yellow"}),
+    new CCFadersToggle(context, {row: 7, column: 3, ccFadersWidth: 2, lowerCC: 1, color: 'green'}),
+    new Metronome(context, {row: 7, column: 1, onColor: 'orange', offColor: 'white'}),
+    new ClipArray(context, {row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off"})
   ]
 
   const collapsedInterfaceModules: ControllerModule[] = [
     new Debug(context),
-    new FollowerClipColumn(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4 }),
-    new OverdubToggle(context, {row: 4, column: 0}),
-    new UndoRedo(context, {row: 5, column: 0}),
-    new CCFadersToggle(context, { row: 6, column: 0, ccFadersWidth: 2, lowerCC: 1 }),
-    new InterfaceToggle(context, { row: 7, column: 0 }),
+    new FollowerClipColumn(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off" }),
+    new OverdubToggle(context, {row: 4, column: 0, offColor: 'white', onColor: 'red'}),
+    new UndoRedo(context, {row: 5, column: 0, color: "magenta"}),
+    new CCFadersToggle(context, {row: 6, column: 0, ccFadersWidth: 2, lowerCC: 1, color: 'green'}),
+    new InterfaceToggle(context, {row: 7, column: 0, color: "yellow"}),
   ]
 
   controller.addModules("default", defaultModules)
