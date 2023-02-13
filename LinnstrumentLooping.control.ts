@@ -1033,7 +1033,7 @@ class LiveLoopingController {
   #width = 16
   #height = 8
   #noteOffset = 30  // note played by the lowest key in the play area
-  #rowOffset = 5  // distance in semitomes while going 1 row up
+  #rowOffset = 6  // distance in semitomes while going 1 row up
   #noteColors: lightColor[] = ['orange', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off']
   #firstControlAreaButton = 0
 
@@ -1072,6 +1072,8 @@ class LiveLoopingController {
   }
 
   start(){
+    this.#setupBitwigPreferencesPannel()
+
     this.bitwig.host.getMidiInPort(0).setMidiCallback((...args) => this.handleMidi(...args));
     this.bitwig.host.getMidiInPort(0)
     this.#configureLinnstrument()
@@ -1082,6 +1084,33 @@ class LiveLoopingController {
       })
     })
     this.#update()
+  }
+
+  #setupBitwigPreferencesPannel(){
+    const preferences = this.bitwig.host.getPreferences()
+
+    const rowOffsetSettings: {[key: string]: number} = {
+      '+3': 3,
+      '+4': 4,
+      '+5': 5,
+      '+6': 6,
+      '+7': 7,
+      'OCTAVE': 8
+    }
+    preferences.getEnumSetting('Row Offset', 'Row Offset', Object.keys(rowOffsetSettings), '+5').addValueObserver(chosenOption => {
+      this.#rowOffset = rowOffsetSettings[chosenOption] ?? 5
+      this.#update()
+    })
+
+    const noteIndexes: {[key: string]: number} = {
+      'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8,  'A': 9, 'A#': 10, 'B': 11, 
+    }
+    for(const noteName in noteIndexes){
+      preferences.getEnumSetting(noteName, 'Note Colors', Object.keys(lightColorValues), noteIndexes[noteName] == 0 ? 'orange' : 'off').addValueObserver(chosenColor => {
+        this.#noteColors[noteIndexes[noteName]] = chosenColor as lightColor
+        this.#update()
+      })
+    }
   }
 
   #configureLinnstrument() {

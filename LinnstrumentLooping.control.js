@@ -12,7 +12,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ControllerModule_onUpdate, _ControllerModule_isEnabled, _TracksRow_options, _FollowerClipColumn_options, _FollowerClipColumn_currentTrackIndex, _ClipArray_options, _LoopLength_options, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _UndoRedo_options, _OverdubToggle_options, _InterfaceToggle_options, _CCFadersToggle_instances, _CCFadersToggle_options, _CCFadersToggle_onTap, _CCFadersToggle_onLongPress, _Metronome_instances, _Metronome_options, _Metronome_onTap, _Metronome_onLongPress, _LiveLoopingController_instances, _LiveLoopingController_keyTranslationTable, _LiveLoopingController_noteInput, _LiveLoopingController_currentMode, _LiveLoopingController_linn, _LiveLoopingController_modules, _LiveLoopingController_options, _LiveLoopingController_width, _LiveLoopingController_height, _LiveLoopingController_noteOffset, _LiveLoopingController_rowOffset, _LiveLoopingController_noteColors, _LiveLoopingController_firstControlAreaButton, _LiveLoopingController_configureLinnstrument, _LiveLoopingController_getPlayAreaWidth, _LiveLoopingController_getLeftSplitWidth, _LiveLoopingController_buttonToNote, _LiveLoopingController_setPlayAreaLights, _LiveLoopingController_updateKeyTranslationTable, _LiveLoopingController_update;
+var _LinnStrument_bitwig, _TaskManager_scheduledTasks, _TaskManager_host, _ControllerModule_onUpdate, _ControllerModule_isEnabled, _TracksRow_options, _FollowerClipColumn_options, _FollowerClipColumn_currentTrackIndex, _ClipArray_options, _LoopLength_options, _LoopLength_bars, _LoopLength_nextBars, _LoopLength_pressedButtons, _UndoRedo_options, _OverdubToggle_options, _InterfaceToggle_options, _CCFadersToggle_instances, _CCFadersToggle_options, _CCFadersToggle_onTap, _CCFadersToggle_onLongPress, _Metronome_instances, _Metronome_options, _Metronome_onTap, _Metronome_onLongPress, _LiveLoopingController_instances, _LiveLoopingController_keyTranslationTable, _LiveLoopingController_noteInput, _LiveLoopingController_currentMode, _LiveLoopingController_linn, _LiveLoopingController_modules, _LiveLoopingController_options, _LiveLoopingController_width, _LiveLoopingController_height, _LiveLoopingController_noteOffset, _LiveLoopingController_rowOffset, _LiveLoopingController_noteColors, _LiveLoopingController_firstControlAreaButton, _LiveLoopingController_setupBitwigPreferencesPannel, _LiveLoopingController_configureLinnstrument, _LiveLoopingController_getPlayAreaWidth, _LiveLoopingController_getLeftSplitWidth, _LiveLoopingController_buttonToNote, _LiveLoopingController_setPlayAreaLights, _LiveLoopingController_updateKeyTranslationTable, _LiveLoopingController_update;
 const lightColorValues = {
     default: 0,
     red: 1,
@@ -759,7 +759,7 @@ class LiveLoopingController {
         _LiveLoopingController_width.set(this, 16);
         _LiveLoopingController_height.set(this, 8);
         _LiveLoopingController_noteOffset.set(this, 30); // note played by the lowest key in the play area
-        _LiveLoopingController_rowOffset.set(this, 5); // distance in semitomes while going 1 row up
+        _LiveLoopingController_rowOffset.set(this, 6); // distance in semitomes while going 1 row up
         _LiveLoopingController_noteColors.set(this, ['orange', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off', 'off']);
         _LiveLoopingController_firstControlAreaButton.set(this, 0);
         this.bitwig = bitwig;
@@ -792,6 +792,7 @@ class LiveLoopingController {
         __classPrivateFieldGet(this, _LiveLoopingController_modules, "f")[mode] = __classPrivateFieldGet(this, _LiveLoopingController_modules, "f")[mode].concat(modules);
     }
     start() {
+        __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_setupBitwigPreferencesPannel).call(this);
         this.bitwig.host.getMidiInPort(0).setMidiCallback((...args) => this.handleMidi(...args));
         this.bitwig.host.getMidiInPort(0);
         __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_configureLinnstrument).call(this);
@@ -865,7 +866,31 @@ class LiveLoopingController {
         __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setLight(linnOptions);
     }
 }
-_LiveLoopingController_keyTranslationTable = new WeakMap(), _LiveLoopingController_noteInput = new WeakMap(), _LiveLoopingController_currentMode = new WeakMap(), _LiveLoopingController_linn = new WeakMap(), _LiveLoopingController_modules = new WeakMap(), _LiveLoopingController_options = new WeakMap(), _LiveLoopingController_width = new WeakMap(), _LiveLoopingController_height = new WeakMap(), _LiveLoopingController_noteOffset = new WeakMap(), _LiveLoopingController_rowOffset = new WeakMap(), _LiveLoopingController_noteColors = new WeakMap(), _LiveLoopingController_firstControlAreaButton = new WeakMap(), _LiveLoopingController_instances = new WeakSet(), _LiveLoopingController_configureLinnstrument = function _LiveLoopingController_configureLinnstrument() {
+_LiveLoopingController_keyTranslationTable = new WeakMap(), _LiveLoopingController_noteInput = new WeakMap(), _LiveLoopingController_currentMode = new WeakMap(), _LiveLoopingController_linn = new WeakMap(), _LiveLoopingController_modules = new WeakMap(), _LiveLoopingController_options = new WeakMap(), _LiveLoopingController_width = new WeakMap(), _LiveLoopingController_height = new WeakMap(), _LiveLoopingController_noteOffset = new WeakMap(), _LiveLoopingController_rowOffset = new WeakMap(), _LiveLoopingController_noteColors = new WeakMap(), _LiveLoopingController_firstControlAreaButton = new WeakMap(), _LiveLoopingController_instances = new WeakSet(), _LiveLoopingController_setupBitwigPreferencesPannel = function _LiveLoopingController_setupBitwigPreferencesPannel() {
+    const preferences = this.bitwig.host.getPreferences();
+    const rowOffsetSettings = {
+        '+3': 3,
+        '+4': 4,
+        '+5': 5,
+        '+6': 6,
+        '+7': 7,
+        'OCTAVE': 8
+    };
+    preferences.getEnumSetting('Row Offset', 'Row Offset', Object.keys(rowOffsetSettings), '+5').addValueObserver(chosenOption => {
+        var _a;
+        __classPrivateFieldSet(this, _LiveLoopingController_rowOffset, (_a = rowOffsetSettings[chosenOption]) !== null && _a !== void 0 ? _a : 5, "f");
+        __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_update).call(this);
+    });
+    const noteIndexes = {
+        'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11,
+    };
+    for (const noteName in noteIndexes) {
+        preferences.getEnumSetting(noteName, 'Note Colors', Object.keys(lightColorValues), noteIndexes[noteName] == 0 ? 'orange' : 'off').addValueObserver(chosenColor => {
+            __classPrivateFieldGet(this, _LiveLoopingController_noteColors, "f")[noteIndexes[noteName]] = chosenColor;
+            __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_update).call(this);
+        });
+    }
+}, _LiveLoopingController_configureLinnstrument = function _LiveLoopingController_configureLinnstrument() {
     // Global settings
     __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setRowOffset(0);
     __classPrivateFieldGet(this, _LiveLoopingController_linn, "f").setTransposition(3, 1);
