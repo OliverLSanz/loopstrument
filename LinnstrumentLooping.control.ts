@@ -347,7 +347,7 @@ class PressHandler {
     this.taskManager = taskManager
   }
 
-  handlePressBegin(shortPress: () => void, longPress: () => void, millis: number, buttonId: number) {
+  handlePressBegin(shortPress: () => void, longPress: () => void, buttonId: number, millis: number = 500) {
     const taskId = this.taskManager.scheduleTask(() => {
       longPress()
       delete this.longPressTasks[buttonId]
@@ -582,7 +582,7 @@ class FollowerClipColumn extends ClipControllerModule {
 
         const [onTap, onLongPress] = this.getClipPressedCallbacks(trackIndex, clipIndex, this.#options.firstTrackIndex, this.bitwig)
 
-        this.pressHandler.handlePressBegin(onTap, onLongPress, 1000, midi.data1)
+        this.pressHandler.handlePressBegin(onTap, onLongPress, midi.data1)
       }
 
       if (midi.type === NOTE_OFF) {
@@ -655,7 +655,7 @@ class ClipArray extends ClipControllerModule {
 
         const [onTap, onLongPress] = this.getClipPressedCallbacks(trackIndex, clipIndex, this.#options.firstTrackIndex, this.bitwig)
         
-        this.pressHandler.handlePressBegin(onTap, onLongPress, 1000, midi.data1)
+        this.pressHandler.handlePressBegin(onTap, onLongPress, midi.data1)
       }
 
       if (midi.type === NOTE_OFF) {
@@ -811,7 +811,7 @@ class UndoRedo extends ControllerModule {
     const buttonNote = this.controller.coordinateToControlSplitButton({row: this.#options.row, column: this.#options.column})
 
     if (midi.type === NOTE_ON && midi.data1 === buttonNote) {
-      this.pressHandler.handlePressBegin(() => this.bitwig.application.undo(), () => this.bitwig.application.redo(), 500, midi.data1)
+      this.pressHandler.handlePressBegin(() => this.bitwig.application.undo(), () => this.bitwig.application.redo(), midi.data1)
       return true
     }
 
@@ -918,7 +918,7 @@ class CCFadersToggle extends ControllerModule {
   handleMidi(midi: MidiMessage): boolean {
     const button = this.controller.coordinateToControlSplitButton({row: this.#options.row, column: this.#options.column})
     if (midi.type === NOTE_ON && midi.data1 === button) {
-      this.pressHandler.handlePressBegin(() => this.#onTap(), () => this.#onLongPress(), 500, midi.data1)
+      this.pressHandler.handlePressBegin(() => this.#onTap(), () => this.#onLongPress(), midi.data1)
       return true
     }
     if(midi.type === NOTE_OFF && midi.data1 === button){
@@ -971,7 +971,7 @@ class Metronome extends ControllerModule {
     const button = this.controller.coordinateToControlSplitButton({row: this.#options.row, column: this.#options.column})
 
     if (midi.type === NOTE_ON && midi.data1 === button) {
-      this.pressHandler.handlePressBegin(() => this.#onTap(), () => this.#onLongPress(), 500, midi.data1)
+      this.pressHandler.handlePressBegin(() => this.#onTap(), () => this.#onLongPress(), midi.data1)
       return true
     }
 
@@ -1337,19 +1337,24 @@ function init() {
   const defaultModules: ControllerModule[] = [
     new Debug(context),
     new TracksRow(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, armedTrackColor: "magenta", unarmedTrackColor: "off"}),
-    new ClipArray(context, {row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off"}),
-    new LoopLength(context, {row: 6, column: 0, offColor: 'off', onColor: 'blue'}),
+    new ClipArray(context, {row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: 'red', playingColor: "orange", pausedColor: "white", emptyColor: "blue"}),
+    new LoopLength(context, {row: 6, column: 0, offColor: 'off', onColor: 'orange'}),
+    // low-light option
+    // new ClipArray(context, {row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off"}),
+    // new LoopLength(context, {row: 6, column: 0, offColor: 'off', onColor: 'blue'}),
     new UndoRedo(context, {row: 7, column: 2, color: 'magenta'}),
     new OverdubToggle(context, {row: 7, column: 0, offColor: 'white', onColor: 'red'}),
     new InterfaceToggle(context, {row: 7, column: 4, color: "yellow"}),
     new CCFadersToggle(context, {row: 7, column: 3, ccFadersWidth: 2, lowerCC: 1, color: 'green'}),
     new Metronome(context, {row: 7, column: 1, onColor: 'orange', offColor: 'white'}),
-    new ClipArray(context, {row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off"})
+    new ClipArray(context, {row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1, recordingColor: "red", playingColor: "green", pausedColor: "white", emptyColor: "cyan"})
+    // new ClipArray(context, {row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off"})
   ]
 
   const collapsedInterfaceModules: ControllerModule[] = [
     new Debug(context),
-    new FollowerClipColumn(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off" }),
+    new FollowerClipColumn(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: 'red', playingColor: "orange", pausedColor: "white", emptyColor: "blue"}),
+    // new FollowerClipColumn(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off" }),
     new OverdubToggle(context, {row: 4, column: 0, offColor: 'white', onColor: 'red'}),
     new UndoRedo(context, {row: 5, column: 0, color: "magenta"}),
     new CCFadersToggle(context, {row: 6, column: 0, ccFadersWidth: 2, lowerCC: 1, color: 'green'}),
