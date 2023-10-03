@@ -1098,8 +1098,10 @@ class LiveLoopingController {
       'OCTAVE': 8
     }
     preferences.getEnumSetting('Row Offset', 'Row Offset', Object.keys(rowOffsetSettings), '+5').addValueObserver(chosenOption => {
-      this.#rowOffset = rowOffsetSettings[chosenOption] ?? 5
-      this.#update()
+      if(this.#rowOffset !== rowOffsetSettings[chosenOption] ?? 5){
+        this.#rowOffset = rowOffsetSettings[chosenOption] ?? 5
+        this.#update()
+      }
     })
 
     const noteIndexes: {[key: string]: number} = {
@@ -1107,8 +1109,10 @@ class LiveLoopingController {
     }
     for(const noteName in noteIndexes){
       preferences.getEnumSetting(noteName, 'Note Colors', Object.keys(lightColorValues), noteIndexes[noteName] == 0 ? 'orange' : 'off').addValueObserver(chosenColor => {
-        this.#noteColors[noteIndexes[noteName]] = chosenColor as lightColor
-        this.#update()
+        if(this.#noteColors[noteIndexes[noteName]] !== chosenColor as lightColor){
+          this.#noteColors[noteIndexes[noteName]] = chosenColor as lightColor
+          this.#update()
+        }
       })
     }
   }
@@ -1335,7 +1339,7 @@ function init() {
   }
 
   const defaultModules: ControllerModule[] = [
-    new Debug(context),
+    // new Debug(context),
     new TracksRow(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, armedTrackColor: "magenta", unarmedTrackColor: "off"}),
     new ClipArray(context, {row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: 'red', playingColor: "orange", pausedColor: "white", emptyColor: "blue"}),
     new LoopLength(context, {row: 6, column: 0, offColor: 'off', onColor: 'orange'}),
@@ -1352,7 +1356,7 @@ function init() {
   ]
 
   const collapsedInterfaceModules: ControllerModule[] = [
-    new Debug(context),
+    // new Debug(context),
     new FollowerClipColumn(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: 'red', playingColor: "orange", pausedColor: "white", emptyColor: "blue"}),
     // new FollowerClipColumn(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off" }),
     new OverdubToggle(context, {row: 4, column: 0, offColor: 'white', onColor: 'red'}),

@@ -877,17 +877,21 @@ _LiveLoopingController_keyTranslationTable = new WeakMap(), _LiveLoopingControll
         'OCTAVE': 8
     };
     preferences.getEnumSetting('Row Offset', 'Row Offset', Object.keys(rowOffsetSettings), '+5').addValueObserver(chosenOption => {
-        var _a;
-        __classPrivateFieldSet(this, _LiveLoopingController_rowOffset, (_a = rowOffsetSettings[chosenOption]) !== null && _a !== void 0 ? _a : 5, "f");
-        __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_update).call(this);
+        var _a, _b;
+        if ((_a = __classPrivateFieldGet(this, _LiveLoopingController_rowOffset, "f") !== rowOffsetSettings[chosenOption]) !== null && _a !== void 0 ? _a : 5) {
+            __classPrivateFieldSet(this, _LiveLoopingController_rowOffset, (_b = rowOffsetSettings[chosenOption]) !== null && _b !== void 0 ? _b : 5, "f");
+            __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_update).call(this);
+        }
     });
     const noteIndexes = {
         'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11,
     };
     for (const noteName in noteIndexes) {
         preferences.getEnumSetting(noteName, 'Note Colors', Object.keys(lightColorValues), noteIndexes[noteName] == 0 ? 'orange' : 'off').addValueObserver(chosenColor => {
-            __classPrivateFieldGet(this, _LiveLoopingController_noteColors, "f")[noteIndexes[noteName]] = chosenColor;
-            __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_update).call(this);
+            if (__classPrivateFieldGet(this, _LiveLoopingController_noteColors, "f")[noteIndexes[noteName]] !== chosenColor) {
+                __classPrivateFieldGet(this, _LiveLoopingController_noteColors, "f")[noteIndexes[noteName]] = chosenColor;
+                __classPrivateFieldGet(this, _LiveLoopingController_instances, "m", _LiveLoopingController_update).call(this);
+            }
         });
     }
 }, _LiveLoopingController_configureLinnstrument = function _LiveLoopingController_configureLinnstrument() {
@@ -1005,7 +1009,7 @@ function init() {
         controller: controller
     };
     const defaultModules = [
-        new Debug(context),
+        // new Debug(context),
         new TracksRow(context, { row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, armedTrackColor: "magenta", unarmedTrackColor: "off" }),
         new ClipArray(context, { row: 1, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: 'red', playingColor: "orange", pausedColor: "white", emptyColor: "blue" }),
         new LoopLength(context, { row: 6, column: 0, offColor: 'off', onColor: 'orange' }),
@@ -1021,7 +1025,7 @@ function init() {
         // new ClipArray(context, {row: 5, column: 0, firstTrackIndex: 5, numberOfTracks: 5, clipsPerTrack: 1, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off"})
     ];
     const collapsedInterfaceModules = [
-        new Debug(context),
+        // new Debug(context),
         new FollowerClipColumn(context, { row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: 'red', playingColor: "orange", pausedColor: "white", emptyColor: "blue" }),
         // new FollowerClipColumn(context, {row: 0, column: 0, firstTrackIndex: 0, numberOfTracks: 5, clipsPerTrack: 4, recordingColor: "red", playingColor: "blue", pausedColor: "white", emptyColor: "off" }),
         new OverdubToggle(context, { row: 4, column: 0, offColor: 'white', onColor: 'red' }),
