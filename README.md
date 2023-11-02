@@ -1,73 +1,51 @@
-For the changes to take effect on the JS code:
+# Linnstrument Bitwig script for Live Looping
+
+This is a controller script for Bitwig. It allows you access some features of Bitwig directly from your Linnstrument, allowing you to live loop without much or any direct interaction with your computer or any other input device.
+
+## How to Use
+
+> **IMPORTANT** - When you connect your Linnstrument, the script will automatically overwrite it's configuration (row offset, channels, etc). This is needed for the controller to work.
+
+### Instalation
+
+The script is defined as a single Javascript (.js) file.
+
+Please refer to the [Bitwig documentation](https://www.bitwig.com/support/technical_support/how-do-i-add-a-controller-extension-or-script-17/) on how to install a controller script.
+
+The file you need to install is [here](LinnstrumentLooping.control.js).
+
+### Usage
+
+I will soon release a couple of videos explaining this visually.
+
+## Development
+
+> Disclaimers:
+>
+> - This project has been developed as a quick and dirty side project for personal usage. Shortcuts have been taken.
+>
+> - If you want to modify or extend the controller, I encourage you to do so and will be there to support you. Also, the code is designed to be easily extendable.
+>
+> - BUT probably won't be obious how to do so, as documentation is scarce. You will need to learn by example.
+>
+
+### Setup
+
+First, clone the repository. I advise to directly clone it in the directory where Bitwig looks for controller scripts. This way you can develop and test your changes in real time, as the script will be reloaded by Bitwig each time it changes.
+
+### File structure
+
+Don't directly modify the `LinnstrumentLooping.control.js` file. Instead, the project is set up as a Typescript project.
+
+> Using namespaces is the best way I found to be able to split the code into different files and get typescript to compile them all into a single file that still has the functions needed by Bitwig defined at the top level of the file. This is why most of the code is enclosed in a dummy `_` namespace.
+
+The source files are inside the `src` directory. The most important ones are:
+- `src/script.ts` - Main entry point and configuration file. Here you can modify the "buttons" present in the interface of your Linnstrument and configure it using the existing modules. Easiest place to start changing things.
+- `src/modules` - Defines the different modules. A simple example to see how they work is `src/modules/OverdubToggle.ts`. Creating new modules is the best way to add new functionality.
+- `src/Controller.ts` - Defines the main behavior of the controller that sets it up and glues together all the modules. You will need to modify this to alter the base framework of the script.
+
+You'll need to run this line for your changes to be bundled in the main `.js` file.
 
 ```
-yarn tsc --watch
+yarn watch
 ```
-
-# Linnstrument setup
-
-Channel 0 is used to control bitwig
-
-Rest of channels are used to play music.
-
-## Left split
-
-MIDI MODE: One Channel
-MAIN CHANNEL: 1
-PITCH/X: OFF
-TIMBRE/Y: OFF
-LOUDNESS/Z: OFF
-WIDTH: 5 Columns
-PLAYED COLOR: Off (no light)
-
-## Right Split
-
-MIDI MODE: Channel Per Note
-PerNote Chan: all from 2 to 16
-BEND RANGE: 48
-PITCH: ON
-TIMBRE: ON, CC74
-LOUDNESS: ON, Channel Pres
-
-## Global Settings
-
-ROW OFFSET: +5
-POWER/MIDI: USB
-
-# Manual
-
-## Change track
-
-Use the 5 top buttons in the left split to change between the first 5 tracks
-in bitwig. The leds will tell which track is currently engaged.
-
-## Use Clips
-
-The three rows bellow the track row are the clip launchers.
-
-- Launch an empty clip with that track enabled to start recording (red light
-  will turn on).
-
-- Press again to stop recording (white light will indicate that the clip has
-  content).
-
-- Press any clip with content to launch it.
-
-- Press again to stop it.
-
-- Only one clip from each track can play at the same time.
-
-- Long press on a clip to delete it.
-
-## Function table
-
-|     | 0                            | 1                    | 2                    | 3                    | 4                    |
-| --- | ---------------------------- | -------------------- | -------------------- | -------------------- | -------------------- |
-| 0   | Arm track 1                  | Arm Track 2          | Arm track 3          | Arm track 4          | Arm track 5          |
-| 1   | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
-| 2   | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
-| 3   | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
-| 4   |                              |                      |                      |                      |                      |
-| 5   |                              |                      |                      |                      |                      |
-| 6   |                              |                      |                      |                      |                      |
-| 7   | Toggle clip launcher overdub | Undo                 | Redo                 |                      |                      |
