@@ -46,10 +46,10 @@ in bitwig. The leds will tell which track is currently engaged.
 The three rows bellow the track row are the clip launchers.
 
 - Launch an empty clip with that track enabled to start recording (red light
-will turn on).
+  will turn on).
 
 - Press again to stop recording (white light will indicate that the clip has
-content).
+  content).
 
 - Press any clip with content to launch it.
 
@@ -61,13 +61,13 @@ content).
 
 ## Function table
 
-|   | 0                            | 1                    | 2                    | 3                    | 4                    |
-|---|------------------------------|----------------------|----------------------|----------------------|----------------------|
-| 0 | Arm track 1                  | Arm Track 2          | Arm track 3          | Arm track 4          | Arm track 5          |
-| 1 | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
-| 2 | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
-| 3 | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
-| 4 |                              |                      |                      |                      |                      |
-| 5 |                              |                      |                      |                      |                      |
-| 6 |                              |                      |                      |                      |                      |
-| 7 | Toggle clip launcher overdub | Undo   | Redo                  |                      |                      |
+|     | 0                            | 1                    | 2                    | 3                    | 4                    |
+| --- | ---------------------------- | -------------------- | -------------------- | -------------------- | -------------------- |
+| 0   | Arm track 1                  | Arm Track 2          | Arm track 3          | Arm track 4          | Arm track 5          |
+| 1   | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
+| 2   | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
+| 3   | Record / Toggle clip         | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip | Record / Toggle clip |
+| 4   |                              |                      |                      |                      |                      |
+| 5   |                              |                      |                      |                      |                      |
+| 6   |                              |                      |                      |                      |                      |
+| 7   | Toggle clip launcher overdub | Undo                 | Redo                 |                      |                      |

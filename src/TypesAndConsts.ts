@@ -1,20 +1,26 @@
-//  __                              __,-,__                           __
-// |  |_.--.--.-----.-----.-----.  |  ' '__|  .----.-----.-----.-----|  |_.-----.
-// |   _|  |  |  _  |  -__|__ --|  |     __|  |  __|  _  |     |__ --|   _|__ --|
-// |____|___  |   __|_____|_____|  |_______|  |____|_____|__|__|_____|____|_____|
-//      |_____|__|                    |_|
-
+// Types and constants used accross the project.
 
 namespace L {
-
   export interface MidiMessage {
-    type: number,
-    channel: number,
-    data1: number,
-    data2: number
+    type: number;
+    channel: number;
+    data1: number;
+    data2: number;
   }
 
-  export type lightColor = "default" | "red" | "yellow" | "green" | "cyan" | "blue" | "magenta" | "off" | "white" | "orange" | "lime" | "pink"
+  export type lightColor =
+    | "default"
+    | "red"
+    | "yellow"
+    | "green"
+    | "cyan"
+    | "blue"
+    | "magenta"
+    | "off"
+    | "white"
+    | "orange"
+    | "lime"
+    | "pink";
 
   export const lightColorValues = {
     default: 0,
@@ -29,16 +35,16 @@ namespace L {
     orange: 9,
     lime: 10,
     pink: 11,
-  }
+  };
 
-  export type row = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
-  export type column = 0 | 1 | 2 | 3 | 4
-  export const rowIndexes: row[] = [0, 1, 2, 3, 4, 5, 6, 7]
-  export const columnIndexes: column[] = [0, 1, 2, 3, 4]
+  export type row = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  export type column = 0 | 1 | 2 | 3 | 4;
+  export const rowIndexes: row[] = [0, 1, 2, 3, 4, 5, 6, 7];
+  export const columnIndexes: column[] = [0, 1, 2, 3, 4];
 
-  export const NOTE_OFF = 8
-  export const NOTE_ON = 9
-  export const CC = 11
+  export const NOTE_OFF = 8;
+  export const NOTE_ON = 9;
+  export const CC = 11;
 
-  export const MAX_MIDI_NOTE = 127
+  export const MAX_MIDI_NOTE = 127;
 }

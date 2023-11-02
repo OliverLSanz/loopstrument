@@ -4,7 +4,7 @@
     "module": "none", // or "system", depending on your preference
     "outFile": "./LinnstrumentLooping.control.js",
     "rootDir": ".", // assuming your TypeScript files are in a directory named src
-    "types": ["typed-bitwig-api"],
+    "types": ["typed-bitwig-api"]
     // other options as needed
   },
   "files": [
@@ -18,4 +18,3 @@
     "node_modules" // typical exclude
   ]
 }
-
