@@ -1,4 +1,6 @@
-# Linnstrument Bitwig script for Live Looping
+**Linnstrument Bitwig script for Live Looping**
+
+# Loopstrument
 
 This is a controller script for Bitwig. It allows you access some features of Bitwig directly from your Linnstrument, allowing you to live loop without much or any direct interaction with your computer or any other input device.
 
