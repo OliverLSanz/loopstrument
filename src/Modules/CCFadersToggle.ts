@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   interface CCFadersToggleOptions {
     row: number;
     column: number;

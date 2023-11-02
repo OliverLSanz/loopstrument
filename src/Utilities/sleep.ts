@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   export function sleep(milliseconds: number) {
     const date = Date.now();
     let currentDate = null;

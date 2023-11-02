@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   /**
    * Allows setting different callbacks for taps and long-presses.
    */

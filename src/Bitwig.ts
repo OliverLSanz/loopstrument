@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   /**
    * Class used to interact with the Bitwig API
    *

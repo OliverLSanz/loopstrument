@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   /**
    * Base functionality to control clips
    */

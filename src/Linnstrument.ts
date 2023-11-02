@@ -1,7 +1,7 @@
 // This file defines a class to control the linnstrument more
 // easily. All is done through the Bitwig interface.
 
-namespace L {
+namespace _ {
   type Split = "left" | "right";
 
   export class LinnStrument {

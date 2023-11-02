@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   interface InterfaceToggleOptions {
     row: number;
     column: number;

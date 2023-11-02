@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   export interface ControllerOptions {
     // Width of the CC sliders left split
     ccSlidersWidth: number;

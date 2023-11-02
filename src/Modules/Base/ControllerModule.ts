@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   export interface ModuleContext {
     bitwig: Bitwig;
     pressHandler: PressHandler;

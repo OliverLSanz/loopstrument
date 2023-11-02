@@ -17,18 +17,18 @@ host.defineController(
 host.defineMidiPorts(1, 1);
 
 function init() {
-  const taskManager = new L.TaskManager(host);
-  const pressHandler = new L.PressHandler(taskManager);
-  const bitwig = new L.Bitwig(host);
-  const linn = new L.LinnStrument(bitwig);
+  const taskManager = new _.TaskManager(host);
+  const pressHandler = new _.PressHandler(taskManager);
+  const bitwig = new _.Bitwig(host);
+  const linn = new _.LinnStrument(bitwig);
 
-  const controllerOptions: L.ControllerOptions = {
+  const controllerOptions: _.ControllerOptions = {
     ccSlidersWidth: 2,
     interfaceWidth: 5,
   };
 
   // init the controler with all the pieces it needs to work
-  const controller = new L.LiveLoopingController(
+  const controller = new _.LiveLoopingController(
     bitwig,
     pressHandler,
     linn,
@@ -36,7 +36,7 @@ function init() {
   );
 
   // define context to be passed to each module
-  const context: L.ModuleContext = {
+  const context: _.ModuleContext = {
     bitwig: bitwig,
     pressHandler: pressHandler,
     linnstrument: linn,
@@ -46,10 +46,10 @@ function init() {
   // here you can change the layout and modules for the default mode (aka not collapsed interface).
   // each item of the list is a module that will be added to the controller.
   // each module parameters defines it's behavior and location.
-  const defaultModules: L.ControllerModule[] = [
+  const defaultModules: _.ControllerModule[] = [
     // uncomment this to print incoming midi messages to the Bitwig Console
     // new Debug(context),
-    new L.TracksRow(context, {
+    new _.TracksRow(context, {
       row: 0,
       column: 0,
       firstTrackIndex: 0,
@@ -57,7 +57,7 @@ function init() {
       armedTrackColor: "magenta",
       unarmedTrackColor: "off",
     }),
-    new L.ClipArray(context, {
+    new _.ClipArray(context, {
       row: 1,
       column: 0,
       firstTrackIndex: 0,
@@ -68,34 +68,34 @@ function init() {
       pausedColor: "white",
       emptyColor: "blue",
     }),
-    new L.LoopLength(context, {
+    new _.LoopLength(context, {
       row: 6,
       column: 0,
       offColor: "off",
       onColor: "orange",
     }),
-    new L.UndoRedo(context, { row: 7, column: 2, color: "magenta" }),
-    new L.OverdubToggle(context, {
+    new _.UndoRedo(context, { row: 7, column: 2, color: "magenta" }),
+    new _.OverdubToggle(context, {
       row: 7,
       column: 0,
       offColor: "white",
       onColor: "red",
     }),
-    new L.InterfaceToggle(context, { row: 7, column: 4, color: "yellow" }),
-    new L.CCFadersToggle(context, {
+    new _.InterfaceToggle(context, { row: 7, column: 4, color: "yellow" }),
+    new _.CCFadersToggle(context, {
       row: 7,
       column: 3,
       ccFadersWidth: 2,
       lowerCC: 1,
       color: "green",
     }),
-    new L.Metronome(context, {
+    new _.Metronome(context, {
       row: 7,
       column: 1,
       onColor: "orange",
       offColor: "white",
     }),
-    new L.ClipArray(context, {
+    new _.ClipArray(context, {
       row: 5,
       column: 0,
       firstTrackIndex: 5,
@@ -109,10 +109,10 @@ function init() {
   ];
 
   // here you can change the layout and modules for the collapsed interface mode
-  const collapsedInterfaceModules: L.ControllerModule[] = [
+  const collapsedInterfaceModules: _.ControllerModule[] = [
     // uncomment this to print incoming midi messages to the Bitwig Console
     // new Debug(context),
-    new L.FollowerClipColumn(context, {
+    new _.FollowerClipColumn(context, {
       row: 0,
       column: 0,
       firstTrackIndex: 0,
@@ -123,21 +123,21 @@ function init() {
       pausedColor: "white",
       emptyColor: "blue",
     }),
-    new L.OverdubToggle(context, {
+    new _.OverdubToggle(context, {
       row: 4,
       column: 0,
       offColor: "white",
       onColor: "red",
     }),
-    new L.UndoRedo(context, { row: 5, column: 0, color: "magenta" }),
-    new L.CCFadersToggle(context, {
+    new _.UndoRedo(context, { row: 5, column: 0, color: "magenta" }),
+    new _.CCFadersToggle(context, {
       row: 6,
       column: 0,
       ccFadersWidth: 2,
       lowerCC: 1,
       color: "green",
     }),
-    new L.InterfaceToggle(context, { row: 7, column: 0, color: "yellow" }),
+    new _.InterfaceToggle(context, { row: 7, column: 0, color: "yellow" }),
   ];
 
   // add modules for the default mode

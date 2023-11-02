@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   interface LoopLengthOptions {
     row: number;
     column: number;

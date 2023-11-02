@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   interface OverdubToggleOptions {
     row: number;
     column: number;

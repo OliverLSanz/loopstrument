@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   interface UndoRedoOptions {
     row: number;
     column: number;

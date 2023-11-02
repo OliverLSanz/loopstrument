@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   interface MetronomeOptions {
     row: number;
     column: number;

@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   interface FollowerClipColumnOptions {
     row: number;
     column: number;

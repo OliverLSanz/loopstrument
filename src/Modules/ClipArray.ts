@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   interface ClipArrayOptions {
     row: number;
     column: number;

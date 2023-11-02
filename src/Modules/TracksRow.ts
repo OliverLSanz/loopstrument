@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   interface TracksRowOptions {
     row: number;
     column: number;

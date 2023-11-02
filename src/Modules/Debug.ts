@@ -1,4 +1,4 @@
-namespace L {
+namespace _ {
   export class Debug extends ControllerModule {
     init(): void {}
 

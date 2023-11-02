@@ -1,6 +1,6 @@
 // Types and constants used accross the project.
 
-namespace L {
+namespace _ {
   export interface MidiMessage {
     type: number;
     channel: number;
