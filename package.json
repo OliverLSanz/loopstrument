@@ -1,7 +1,11 @@
 {
   "devDependencies": {
     "typed-bitwig-api": "^17.0.1",
-    "typescript": "^4.7.4"
+    "typescript": "^5.2.2"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  }
 }
