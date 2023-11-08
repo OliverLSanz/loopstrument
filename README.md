@@ -18,7 +18,7 @@ The file you need to install is [here](LinnstrumentLooping.control.js).
 
 ### Usage
 
-I will soon release a couple of videos explaining this visually.
+[Link to demo video](https://youtu.be/S8n6QqYITR4)
 
 ## Development
 
